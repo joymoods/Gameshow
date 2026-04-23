@@ -1,12 +1,27 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGameStore } from '../store/gameStore';
 import type { Question } from '../types';
+import type { ToastType } from '../App';
 
 const API = `http://${window.location.hostname}:8080`;
 
-// ---- Score editor row ----
-function ScoreRow({ playerId, name, score, roomCode }: { playerId: string; name: string; score: number; roomCode: string }) {
+interface ScoreDelta {
+  val: number;
+  key: number;
+}
+
+interface Props {
+  toast: (msg: string, type?: ToastType) => void;
+}
+
+// ---- Score Row ----
+
+function ScoreRow({
+  playerId, name, score, roomCode, isActive, delta,
+}: {
+  playerId: string; name: string; score: number; roomCode: string; isActive: boolean; delta?: ScoreDelta;
+}) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(String(score));
 
@@ -23,54 +38,94 @@ function ScoreRow({ playerId, name, score, roomCode }: { playerId: string; name:
 
   return (
     <div className="score-row">
-      <span className="score-name">{name}</span>
-      {editing ? (
-        <span className="score-edit">
-          <input
-            type="number"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && save()}
-            autoFocus
-            style={{ width: 80 }}
-          />
-          <button className="btn-primary btn-sm" onClick={save}>✓</button>
-          <button className="btn-sm" onClick={() => setEditing(false)}>✕</button>
-        </span>
-      ) : (
-        <span className="score-value" onClick={() => { setDraft(String(score)); setEditing(true); }}>
-          {score} <span className="edit-hint">✏️</span>
-        </span>
-      )}
+      <div className={`score-avatar ${isActive ? 'is-active' : 'not-active'}`}>{name[0]}</div>
+      <span className={`score-name ${isActive ? 'is-active' : ''}`}>{name}</span>
+      <div style={{ position: 'relative' }}>
+        {delta && (
+          <span key={delta.key} className={`score-delta ${delta.val > 0 ? 'is-positive' : 'is-negative'}`}>
+            {delta.val > 0 ? '+' : ''}{delta.val}
+          </span>
+        )}
+        {editing ? (
+          <span className="score-edit">
+            <input
+              type="number"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && save()}
+              autoFocus
+            />
+            <button className="btn-primary btn-sm" onClick={save}>✓</button>
+            <button className="btn-secondary btn-sm" onClick={() => setEditing(false)}>✕</button>
+          </span>
+        ) : (
+          <span
+            className={`score-value ${score < 0 ? 'is-negative' : 'is-positive'}`}
+            onClick={() => { setDraft(String(score)); setEditing(true); }}
+            title="Klicken zum Bearbeiten"
+          >
+            {score}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
 
 // ---- Main ----
-export default function ControlPage() {
+
+export default function ControlPage({ toast }: Props) {
   const navigate = useNavigate();
   const {
     roomCode, board, players, playerOrder,
     activePlayerId, activePlayerName,
     currentQuestion, phase,
     buzzedPlayerId, buzzedPlayerName,
-    finalScores,
-    resetGameState,
+    finalScores, resetGameState,
   } = useGameStore();
 
   const [answering, setAnswering] = useState(false);
+  const [showAnswer, setShowAnswer] = useState(false);
+  const [answerBroadcast, setAnswerBroadcast] = useState(false);
+  const [deltas, setDeltas] = useState<Record<string, ScoreDelta>>({});
 
   const orderedPlayers = playerOrder
     .map((id) => players.find((p) => p.id === id))
     .filter(Boolean) as typeof players;
 
-  // Determine who to judge — buzzed player takes priority over active player
   const judgingPlayerId = buzzedPlayerId ?? activePlayerId;
   const judgingPlayerName = buzzedPlayerName ?? activePlayerName;
 
+  const totalQ = board.reduce((a, c) => a + c.questions.length, 0);
+  const playedQ = board.reduce((a, c) => a + c.questions.filter((q) => q.played).length, 0);
+
+  function flashDelta(pid: string, val: number) {
+    const key = Date.now();
+    setDeltas((d) => ({ ...d, [pid]: { val, key } }));
+    setTimeout(() => setDeltas((d) => { const n = { ...d }; delete n[pid]; return n; }), 1800);
+  }
+
   async function openQuestion(q: Question) {
     if (q.played) return;
+    setShowAnswer(false);
+    setAnswerBroadcast(false);
     await fetch(`${API}/api/rooms/${roomCode}/question/${q.id}/open`, { method: 'POST' });
+  }
+
+  async function closeQuestion() {
+    await fetch(`${API}/api/rooms/${roomCode}/question/close`, { method: 'POST' });
+    toast('Frage beendet', 'info');
+  }
+
+  async function revealAnswer() {
+    await fetch(`${API}/api/rooms/${roomCode}/question/reveal`, { method: 'POST' });
+    setAnswerBroadcast(true);
+    toast('Lösung an Spieler gesendet', 'success');
+  }
+
+  async function endBuzzerPhase() {
+    await fetch(`${API}/api/rooms/${roomCode}/question/end-buzzer`, { method: 'POST' });
+    toast('Buzzer-Phase beendet', 'warning');
   }
 
   async function judgeAnswer(correct: boolean) {
@@ -82,141 +137,262 @@ export default function ControlPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ playerId: judgingPlayerId, correct }),
       });
+      const pts = currentQuestion.points;
+      const isBuzzer = !!buzzedPlayerId;
+      const delta = correct ? (isBuzzer ? Math.round(pts / 2) : pts) : (isBuzzer ? -Math.round(pts / 2) : -Math.round(pts / 2));
+      flashDelta(judgingPlayerId, delta);
+      toast(
+        correct
+          ? `✓ ${judgingPlayerName} +${Math.abs(delta)} Punkte${isBuzzer ? ' (½)' : ''}`
+          : `✗ ${judgingPlayerName} ${delta} Punkte`,
+        correct ? 'success' : 'error'
+      );
     } finally {
       setAnswering(false);
     }
   }
 
-  async function endGame() {
-    if (!confirm('Spiel wirklich beenden?')) return;
-    await fetch(`${API}/api/rooms/${roomCode}/end`, { method: 'POST' });
-  }
+  // Keyboard shortcuts
+  const judgeRef = useRef(judgeAnswer);
+  judgeRef.current = judgeAnswer;
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!currentQuestion || !judgingPlayerId) return;
+      const canJudge = phase === 'ACTIVE_PLAYER_ANSWERING' || (phase === 'BUZZER_PHASE' && buzzedPlayerId);
+      if (!canJudge) return;
+      if (e.key === 'Enter') { e.preventDefault(); judgeRef.current(true); }
+      if (e.key === 'Escape') { e.preventDefault(); judgeRef.current(false); }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [currentQuestion, judgingPlayerId, phase, buzzedPlayerId]);
 
   if (!roomCode) {
-    return <div className="page"><p>Kein aktiver Room. <a href="/">Zurück</a></p></div>;
-  }
-
-  // Game over screen
-  if (phase === 'GAME_OVER') {
-    const scores = finalScores.length > 0 ? finalScores : players;
-    const sorted = [...scores].sort((a, b) => b.score - a.score);
     return (
-      <div className="page gameover-page">
-        <h1>🏆 Spiel vorbei!</h1>
-        <ol className="final-scores">
-          {sorted.map((p, i) => (
-            <li key={p.id} className={i === 0 ? 'winner' : ''}>
-              <span className="rank">#{i + 1}</span>
-              <span className="name">{p.name}</span>
-              <span className="score">{p.score} Punkte</span>
-            </li>
-          ))}
-        </ol>
-        <button className="btn-primary" onClick={() => { resetGameState(); navigate('/'); }}>Neues Spiel</button>
+      <div style={{ padding: 24 }}>
+        <p>Kein aktiver Room. <a href="/" style={{ color: 'var(--primary)' }}>Zurück</a></p>
       </div>
     );
   }
 
+  // Game over
+  if (phase === 'GAME_OVER') {
+    const scores = finalScores.length > 0 ? finalScores : players;
+    const sorted = [...scores].sort((a, b) => b.score - a.score);
+    return (
+      <div className="gameover-page">
+        <div className="gameover-trophy">🏆</div>
+        <h1>Spiel vorbei!</h1>
+        <p className="gameover-subtitle">Herzlichen Glückwunsch an alle Teilnehmer</p>
+        <ol className="final-scores">
+          {sorted.map((p, i) => (
+            <li key={p.id} className={`final-score-item ${i === 0 ? 'winner' : ''}`}>
+              <span className="final-rank">{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}</span>
+              <span className="final-name">{p.name}</span>
+              <span className={`final-score-value ${p.score < 0 ? 'is-negative' : 'is-positive'}`}>
+                {p.score}<span className="final-score-unit">Pts</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+        <button className="btn-primary btn-lg" onClick={() => { resetGameState(); navigate('/'); }}>
+          Neues Spiel
+        </button>
+      </div>
+    );
+  }
+
+  const phaseLabel: Record<string, string> = {
+    QUESTION_OPEN: 'Wähle eine Frage',
+    ACTIVE_PLAYER_ANSWERING: 'Spieler antwortet',
+    BUZZER_PHASE: 'Buzzer-Phase',
+    QUESTION_DONE: 'Frage abgeschlossen',
+  };
+  const phaseDotColor =
+    phase === 'BUZZER_PHASE' ? 'var(--gold)' :
+    phase === 'ACTIVE_PLAYER_ANSWERING' ? 'var(--success)' :
+    phase === 'QUESTION_DONE' ? 'var(--primary)' : 'var(--text-muted)';
+
+  const canJudge = currentQuestion && judgingPlayerId &&
+    (phase === 'ACTIVE_PLAYER_ANSWERING' || (phase === 'BUZZER_PHASE' && buzzedPlayerId));
+
+  const numRows = board[0]?.questions.length ?? 5;
+
   return (
-    <div className="page control-page">
-      <header className="page-header">
-        <h1>Control Panel <span className="room-badge">{roomCode}</span></h1>
-        <button className="btn-danger btn-sm" onClick={endGame}>Spiel beenden</button>
-      </header>
-
-      <div className="control-layout">
-        {/* Left: Board */}
-        <section className="board-section">
-          <h2>Board</h2>
-          <div className="board-grid" style={{ gridTemplateColumns: `repeat(${board.length}, 1fr)` }}>
-            {board.map((cat) => (
-              <div key={cat.id} className="board-column">
-                <div className="board-category">{cat.name}</div>
-                {cat.questions.map((q) => (
-                  <button
-                    key={q.id}
-                    className={`board-cell ${q.played ? 'played' : ''} ${currentQuestion?.questionId === q.id ? 'active' : ''}`}
-                    onClick={() => openQuestion(q)}
-                    disabled={q.played || !!currentQuestion}
-                  >
-                    {q.played ? '' : q.points}
-                  </button>
-                ))}
-              </div>
-            ))}
+    <div className="control-layout">
+      {/* Left: Board */}
+      <div className="board-section">
+        <div className="board-header">
+          <span className="board-label">BOARD</span>
+          <div className="board-meta">
+            {currentQuestion && (
+              <span className="board-shortcut-hint">
+                <kbd>Enter</kbd> Richtig · <kbd>Esc</kbd> Falsch
+              </span>
+            )}
+            <span className="board-progress">{playedQ}/{totalQ} gespielt</span>
           </div>
-        </section>
+        </div>
 
-        {/* Right: Game state */}
-        <aside className="control-sidebar">
-          {/* Active question */}
-          {currentQuestion && (
-            <div className="question-panel">
+        <div
+          className="board-grid"
+          style={{
+            gridTemplateColumns: `repeat(${board.length}, 1fr)`,
+            gridTemplateRows: `auto repeat(${numRows}, 1fr)`,
+          }}
+        >
+          {board.map((cat) => (
+            <div key={cat.id + 'h'} className="board-category">{cat.name}</div>
+          ))}
+          {Array.from({ length: numRows }).map((_, ri) =>
+            board.map((cat) => {
+              const q = cat.questions[ri];
+              if (!q) return <div key={`empty-${cat.id}-${ri}`} style={{ background: 'var(--bg)', borderRadius: 8 }} />;
+              const isActive = currentQuestion?.questionId === q.id;
+              return (
+                <button
+                  key={q.id}
+                  className={`board-cell ${q.played ? 'played' : ''} ${isActive ? 'active' : ''}`}
+                  onClick={() => openQuestion(q)}
+                  disabled={q.played || !!currentQuestion}
+                >
+                  {q.played ? '' : q.points}
+                </button>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      {/* Right: Sidebar */}
+      <aside className="control-sidebar">
+        {/* Active question */}
+        <div className="sidebar-section" style={{ minHeight: 90 }}>
+          <div className="sidebar-label">AKTIVE FRAGE</div>
+          {currentQuestion ? (
+            <div style={{ animation: 'fadeIn 0.2s ease' }}>
               <div className="question-meta">
                 <span className="q-category">{currentQuestion.category}</span>
-                <span className="q-points">{currentQuestion.points} Punkte</span>
+                <span className="q-points">{currentQuestion.points} Pts</span>
               </div>
               <p className="q-text">{currentQuestion.text}</p>
               {currentQuestion.imageUrl && <img src={currentQuestion.imageUrl} alt="" className="q-media" />}
               {currentQuestion.audioUrl && <audio src={currentQuestion.audioUrl} controls className="q-media" />}
               {currentQuestion.videoUrl && <video src={currentQuestion.videoUrl} controls className="q-media" />}
+              {/* Answer reveal */}
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10, marginTop: 2 }}>
+                <button className="q-answer-toggle" onClick={() => setShowAnswer((s) => !s)}>
+                  {showAnswer ? '▲ Antwort verbergen' : '▼ Antwort aufdecken'}
+                </button>
+                {showAnswer && (
+                  (currentQuestion as any).answer ? (
+                    <div className="q-answer-box">{(currentQuestion as any).answer}</div>
+                  ) : (
+                    <div className="q-no-answer">Keine Antwort hinterlegt</div>
+                  )
+                )}
+              </div>
+            </div>
+          ) : (
+            <div style={{ color: 'var(--text-muted)', fontSize: 13, paddingTop: 8 }}>
+              Klicke auf eine Frage im Board
+            </div>
+          )}
+        </div>
+
+        {/* Phase panel */}
+        <div className="sidebar-section">
+          <div className="phase-indicator">
+            <div
+              className="phase-dot"
+              style={{ background: phaseDotColor, boxShadow: `0 0 7px ${phaseDotColor}` }}
+            />
+            <span className="phase-name">{phaseLabel[phase] ?? phase}</span>
+          </div>
+
+          {phase === 'ACTIVE_PLAYER_ANSWERING' && activePlayerName && (
+            <div className="player-badge">
+              <div className="player-badge-avatar active-player">{activePlayerName[0]}</div>
+              <div>
+                <div className="player-badge-label">Aktiver Spieler</div>
+                <div className="player-badge-name">{activePlayerName}</div>
+              </div>
             </div>
           )}
 
-          {/* Current player / phase info */}
-          <div className="phase-panel">
-            <div className="phase-badge">{phase.replace('_', ' ')}</div>
-
-            {phase === 'ACTIVE_PLAYER_ANSWERING' && activePlayerName && (
-              <p className="active-player-info">🎯 Dran: <strong>{activePlayerName}</strong></p>
-            )}
-
-            {phase === 'BUZZER_PHASE' && (
-              <div className="buzzer-info">
-                {buzzedPlayerName
-                  ? <p>🔔 Gebuzzert: <strong>{buzzedPlayerName}</strong></p>
-                  : <p>⏳ Warte auf Buzzer…</p>
-                }
-              </div>
-            )}
-
-            {/* Judge buttons */}
-            {currentQuestion && judgingPlayerId && (phase === 'ACTIVE_PLAYER_ANSWERING' || (phase === 'BUZZER_PHASE' && buzzedPlayerId)) && (
-              <div className="judge-buttons">
-                <p className="judging-label">Antwort von <strong>{judgingPlayerName}</strong>:</p>
-                <button
-                  className="btn-correct"
-                  onClick={() => judgeAnswer(true)}
-                  disabled={answering}
-                >
-                  ✓ Richtig
+          {phase === 'BUZZER_PHASE' && (
+            <>
+              {buzzedPlayerName ? (
+                <div className="player-badge" style={{ border: '1px solid rgba(240,180,41,0.3)', animation: 'buzz 0.4s ease' }}>
+                  <div className="player-badge-avatar buzzed-player">{buzzedPlayerName[0]}</div>
+                  <div>
+                    <div className="player-badge-label">🔔 Gebuzzert</div>
+                    <div className="player-badge-name">{buzzedPlayerName}</div>
+                  </div>
+                </div>
+              ) : (
+                <div className="buzzer-waiting">
+                  <span style={{ fontSize: 18 }}>⏳</span>
+                  <span style={{ fontSize: 14, fontWeight: 500 }}>Warte auf Buzzer…</span>
+                </div>
+              )}
+              {!buzzedPlayerName && (
+                <button className="close-question-btn" onClick={endBuzzerPhase}>
+                  Buzzer-Phase beenden
                 </button>
-                <button
-                  className="btn-wrong"
-                  onClick={() => judgeAnswer(false)}
-                  disabled={answering}
-                >
-                  ✗ Falsch
-                </button>
-              </div>
-            )}
-          </div>
+              )}
+            </>
+          )}
 
-          {/* Scores */}
-          <div className="scores-panel">
-            <h3>Scores</h3>
-            {orderedPlayers.map((p) => (
-              <ScoreRow
-                key={p.id}
-                playerId={p.id}
-                name={p.name}
-                score={p.score}
-                roomCode={roomCode}
-              />
-            ))}
-          </div>
-        </aside>
-      </div>
+          {phase === 'QUESTION_DONE' && (
+            <div className="judge-buttons">
+              <button
+                className="btn-primary"
+                onClick={revealAnswer}
+                disabled={answerBroadcast}
+                style={{ opacity: answerBroadcast ? 0.5 : 1 }}
+              >
+                {answerBroadcast ? '✓ Lösung gesendet' : '▼ Lösung aufdecken'}
+              </button>
+              <button className="btn-secondary" onClick={closeQuestion}>
+                ✕ Frage beenden
+              </button>
+            </div>
+          )}
+
+          {canJudge && (
+            <div className="judge-buttons">
+              <div className="judging-label">
+                Antwort von <strong>{judgingPlayerName}</strong>:
+              </div>
+              <button className="btn-correct" onClick={() => judgeAnswer(true)} disabled={answering}>
+                ✓ Richtig
+              </button>
+              <button className="btn-wrong" onClick={() => judgeAnswer(false)} disabled={answering}>
+                ✗ Falsch
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Scores */}
+        <div className="sidebar-section sidebar-section--grow" style={{ flex: 1 }}>
+          <div className="sidebar-label">SCORES</div>
+          {orderedPlayers.map((p) => (
+            <ScoreRow
+              key={p.id}
+              playerId={p.id}
+              name={p.name}
+              score={p.score}
+              roomCode={roomCode}
+              isActive={p.id === activePlayerId}
+              delta={deltas[p.id]}
+            />
+          ))}
+          <div className="score-hint">Score anklicken zum Bearbeiten</div>
+        </div>
+      </aside>
     </div>
   );
 }

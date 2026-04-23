@@ -4,41 +4,64 @@ import { useGameStore } from '../store/gameStore';
 
 export default function WaitingPage() {
   const navigate = useNavigate();
-  const { phase, players, myPlayerName, roomCode, roomReset, clearRoomReset } = useGameStore();
+  const { myPlayerName, roomCode, players, phase } = useGameStore();
 
   useEffect(() => {
-    if (roomReset) { clearRoomReset(); navigate('/'); return; }
     if (phase === 'QUESTION_OPEN' || phase === 'ACTIVE_PLAYER_ANSWERING' || phase === 'BUZZER_PHASE') {
       navigate('/game');
-    }
-    if (phase === 'GAME_OVER') {
+    } else if (phase === 'GAME_OVER') {
       navigate('/end');
     }
-  }, [phase, roomReset, navigate, clearRoomReset]);
+  }, [phase, navigate]);
 
   if (!roomCode) {
-    return <div className="page centered"><p>Kein Room. <a href="/">Zurück</a></p></div>;
+    return (
+      <div style={{ padding: 24 }}>
+        <p>Kein aktiver Room. <a href="/" style={{ color: 'var(--primary)' }}>Zurück</a></p>
+      </div>
+    );
   }
 
-  const others = players.filter((p) => p.name !== myPlayerName && p.connected);
-
   return (
-    <div className="page centered waiting-page">
-      <div className="waiting-card">
-        <div className="waiting-spinner" />
-        <h2>Warte auf den Moderator…</h2>
-        <p className="waiting-you">Du: <strong>{myPlayerName}</strong></p>
+    <div className="waiting-page">
+      <div className="waiting-brand">
+        <div className="waiting-brand-logo">
+          <span className="waiting-brand-icon">⚡</span>BrainStorm
+        </div>
+        <div className="waiting-status">Warte auf den Moderator…</div>
+        <div className="waiting-info">
+          Als <strong>{myPlayerName}</strong> verbunden ·
+          Room <strong className="waiting-room">{roomCode}</strong>
+        </div>
+      </div>
 
-        {others.length > 0 && (
-          <div className="waiting-players">
-            <p className="waiting-players-label">Andere Spieler:</p>
-            <ul>
-              {others.map((p) => (
-                <li key={p.id}>{p.name}</li>
-              ))}
-            </ul>
-          </div>
-        )}
+      {/* Animated connection indicator */}
+      <div className="waiting-spinner-wrapper">
+        <div className="waiting-ping" />
+        <div className="waiting-spinner" />
+      </div>
+
+      {/* Player list */}
+      <div className="waiting-players-card">
+        <div className="waiting-players-header">
+          <div className="waiting-players-label">SPIELER</div>
+          <div className="waiting-players-count">{players.filter((p) => p.connected).length}/{players.length} verbunden</div>
+        </div>
+        <div className="waiting-player-list">
+          {players.map((p) => {
+            const isMe = p.id === useGameStore.getState().myPlayerId;
+            return (
+              <div key={p.id} className={`waiting-player-item ${isMe ? 'is-me' : ''}`}>
+                <div className={`waiting-player-avatar ${isMe ? 'is-me' : 'other'}`}>
+                  {p.name[0]}
+                </div>
+                <span className={`waiting-player-name ${isMe ? 'is-me' : 'other'}`}>{p.name}</span>
+                {isMe && <span className="waiting-me-label">du</span>}
+                {p.connected && <span className="waiting-connected-dot" />}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ export interface Question {
   categoryId: string;
   points: number;
   text: string;
+  answer?: string;
   imageUrl?: string;
   audioUrl?: string;
   videoUrl?: string;
@@ -29,6 +30,7 @@ export type GamePhase =
   | 'QUESTION_OPEN'
   | 'ACTIVE_PLAYER_ANSWERING'
   | 'BUZZER_PHASE'
+  | 'QUESTION_DONE'
   | 'GAME_OVER';
 
 // ---- WebSocket message types ----
@@ -111,6 +113,7 @@ export const MSG = {
   PLAYER_BUZZED: 'PLAYER_BUZZED',
   ANSWER_RESULT: 'ANSWER_RESULT',
   BOARD_UPDATE: 'BOARD_UPDATE',
+  ANSWER_REVEALED: 'ANSWER_REVEALED',
   GAME_OVER: 'GAME_OVER',
   PLAYER_JOINED: 'PLAYER_JOINED',
   PLAYER_LEFT: 'PLAYER_LEFT',

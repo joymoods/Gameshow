@@ -210,6 +210,13 @@ func (h *Handler) BroadcastAnswerResult(playerID string, correct bool, delta, ne
 	})
 }
 
+func (h *Handler) BroadcastAnswerRevealed(answer string) {
+	h.hub.Broadcast(OutgoingMessage{
+		Type:    MsgAnswerRevealed,
+		Payload: AnswerRevealedPayload{Answer: answer},
+	})
+}
+
 func (h *Handler) BroadcastBoardUpdate(questionID string) {
 	h.hub.Broadcast(OutgoingMessage{
 		Type:    MsgBoardUpdate,

@@ -68,6 +68,10 @@ type PlayerLeftPayload struct {
 	PlayerID string `json:"playerId"`
 }
 
+type AnswerRevealedPayload struct {
+	Answer string `json:"answer"`
+}
+
 type ErrorPayload struct {
 	Message string `json:"message"`
 }
@@ -85,6 +89,7 @@ const (
 	MsgBuzzerOpen     = "BUZZER_OPEN"
 	MsgPlayerBuzzed   = "PLAYER_BUZZED"
 	MsgAnswerResult   = "ANSWER_RESULT"
+	MsgAnswerRevealed = "ANSWER_REVEALED"
 	MsgBoardUpdate    = "BOARD_UPDATE"
 	MsgGameOver       = "GAME_OVER"
 

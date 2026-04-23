@@ -1,81 +1,111 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { connect } from '../ws/socket';
 import { useGameStore } from '../store/gameStore';
 
+const API = `http://${window.location.hostname}:8080`;
+
 export default function JoinPage() {
   const navigate = useNavigate();
+  const setIdentity = useGameStore((s) => s.setIdentity);
+
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
-  const [error, setError] = useState('');
-  const [joining, setJoining] = useState(false);
+  const [err, setErr] = useState('');
+  const [loading, setLoading] = useState(false);
+  const codeRef = useRef<HTMLInputElement>(null);
 
-  async function handleJoin(e: React.FormEvent) {
-    e.preventDefault();
-    const roomCode = code.trim().toUpperCase();
-    const playerName = name.trim();
-    if (!roomCode || !playerName) {
-      setError('Bitte Room-Code und Name eingeben.');
-      return;
-    }
+  useEffect(() => { codeRef.current?.focus(); }, []);
 
-    setJoining(true);
-    setError('');
+  const codeOk = code.length === 6;
+  const nameOk = name.trim().length > 0;
 
+  const codeBorder = codeOk
+    ? `2px solid var(--success)`
+    : code ? `2px solid var(--primary)` : `2px solid var(--border)`;
+  const codeBoxShadow = codeOk
+    ? `0 0 0 3px rgba(34,197,94,0.15)`
+    : code ? `0 0 0 3px rgba(79,110,247,0.15)` : 'none';
+  const nameBorder = nameOk ? `2px solid var(--primary)` : `2px solid var(--border)`;
+  const nameBoxShadow = nameOk ? `0 0 0 3px rgba(79,110,247,0.15)` : 'none';
+
+  async function submit() {
+    if (!codeOk) { setErr('Room-Code muss genau 6 Zeichen lang sein'); return; }
+    if (!nameOk) { setErr('Bitte gib deinen Namen ein'); return; }
+    setLoading(true);
+    setErr('');
     try {
-      // Verify room exists before connecting
-      const res = await fetch(`http://${window.location.hostname}:8080/api/rooms/${roomCode}`);
-      if (!res.ok) {
-        setError('Room nicht gefunden. Code prüfen.');
-        return;
-      }
-
-      useGameStore.getState().setIdentity('', playerName);
-      connect(roomCode, playerName);
+      const res = await fetch(`${API}/api/rooms/${code}`);
+      if (!res.ok) { setErr('Room nicht gefunden'); return; }
+      setIdentity('', name.trim());
+      connect(code, name.trim());
       navigate('/waiting');
     } catch {
-      setError('Verbindung fehlgeschlagen. Backend erreichbar?');
+      setErr('Verbindung fehlgeschlagen');
     } finally {
-      setJoining(false);
+      setLoading(false);
     }
   }
 
   return (
     <div className="join-page">
       <div className="join-card">
-        <h1 className="join-title">Jeopardy</h1>
-        <p className="join-subtitle">Gib den Room-Code und deinen Namen ein</p>
+        <div className="join-brand">
+          <div className="join-brand-logo">
+            <span className="join-brand-icon">⚡</span>BrainStorm
+          </div>
+          <div className="join-brand-subtitle">Gib deinen Room-Code und Namen ein</div>
+        </div>
 
-        <form onSubmit={handleJoin} className="join-form">
-          <input
-            className="join-input code-input"
-            type="text"
-            placeholder="ROOM-CODE"
-            value={code}
-            onChange={(e) => setCode(e.target.value.toUpperCase())}
-            maxLength={6}
-            autoCapitalize="characters"
-            autoComplete="off"
-            spellCheck={false}
-          />
-          <input
-            className="join-input"
-            type="text"
-            placeholder="Dein Name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            maxLength={20}
-            autoComplete="off"
-          />
-          {error && <p className="join-error">{error}</p>}
+        <div className="join-form">
+          <div>
+            <div className="join-field-label">ROOM-CODE</div>
+            <input
+              ref={codeRef}
+              className="join-code-input"
+              value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
+              onKeyDown={(e) => e.key === 'Enter' && submit()}
+              placeholder="A3X9KL"
+              maxLength={6}
+              style={{ border: codeBorder, boxShadow: codeBoxShadow }}
+            />
+            <div className="join-code-dots">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className={`join-code-dot ${i < code.length ? 'filled' : 'empty'}`} />
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="join-field-label">DEIN NAME</div>
+            <input
+              className="join-name-input"
+              value={name}
+              onChange={(e) => setName(e.target.value.slice(0, 20))}
+              onKeyDown={(e) => e.key === 'Enter' && submit()}
+              placeholder="Wie soll dich das Spiel nennen?"
+              style={{ border: nameBorder, boxShadow: nameBoxShadow }}
+            />
+          </div>
+
+          {err && <div className="join-error">{err}</div>}
+
           <button
-            className="join-btn"
-            type="submit"
-            disabled={joining || !code || !name}
+            className={`join-submit ${loading ? 'loading' : 'ready'}`}
+            onClick={submit}
+            disabled={loading}
           >
-            {joining ? 'Verbinde…' : 'Beitreten'}
+            {loading ? (
+              <>
+                <div className="join-spinner" />
+                Verbinde…
+              </>
+            ) : (
+              'Beitreten'
+            )}
           </button>
-        </form>
+        </div>
       </div>
     </div>
   );

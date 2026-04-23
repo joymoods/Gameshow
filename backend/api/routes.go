@@ -127,11 +127,20 @@ func (ro *Router) handleRoomRoutes(w http.ResponseWriter, r *http.Request) {
 		}
 
 	case "question":
-		// POST /api/rooms/:code/question/:id/open
-		if r.Method == http.MethodPost && strings.HasSuffix(rest, "/open") {
-			questionID := strings.TrimSuffix(rest, "/open")
-			ro.handleOpenQuestion(w, r, room, questionID)
-		} else {
+		if r.Method != http.MethodPost {
+			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+		switch {
+		case strings.HasSuffix(rest, "/open"):
+			ro.handleOpenQuestion(w, r, room, strings.TrimSuffix(rest, "/open"))
+		case rest == "close":
+			ro.handleCloseQuestion(w, r, room)
+		case rest == "reveal":
+			ro.handleRevealAnswer(w, r, room)
+		case rest == "end-buzzer":
+			ro.handleEndBuzzerPhase(w, r, room)
+		default:
 			writeError(w, http.StatusNotFound, "not found")
 		}
 
@@ -251,27 +260,17 @@ func (ro *Router) handleAnswer(w http.ResponseWriter, r *http.Request, room *gam
 		return
 	}
 
-	delta, newScore := room.ApplyResult(body.PlayerID, body.Correct, q.Points)
+	points := q.Points
+	if body.Correct && room.GetPhase() == game.PhaseBuzzerPhase {
+		points = points / 2
+	}
+	delta, newScore := room.ApplyResult(body.PlayerID, body.Correct, points)
 	ro.wsHandler.BroadcastAnswerResult(body.PlayerID, body.Correct, delta, newScore)
 
 	if body.Correct {
-		// Correct: mark played, advance turn, back to board
-		room.MarkQuestionPlayed(q.ID)
-		ro.wsHandler.BroadcastBoardUpdate(q.ID)
-		room.SetCurrentQuestion(nil)
+		// Score applied; question stays open until admin explicitly closes it.
+		room.SetPhase(game.PhaseQuestionDone)
 		ro.wsHandler.BroadcastGameState()
-
-		if room.AllQuestionsPlayed() {
-			room.SetPhase(game.PhaseGameOver)
-			snap := room.Snapshot()
-			ro.wsHandler.BroadcastGameOver(snap.Scores)
-		} else {
-			room.NextActivePlayer()
-			room.SetPhase(game.PhaseQuestionOpen)
-			if active := room.ActivePlayer(); active != nil {
-				ro.wsHandler.BroadcastActivePlayer(active)
-			}
-		}
 		writeJSON(w, http.StatusOK, map[string]any{"delta": delta, "newScore": newScore})
 		return
 	}
@@ -287,28 +286,15 @@ func (ro *Router) handleAnswer(w http.ResponseWriter, r *http.Request, room *gam
 	}
 
 	// Wrong answer in buzzer phase — player already recorded in BuzzedPlayers by AttemptBuzz.
-	// Reopen buzzer if any player still hasn't had a chance; otherwise end question.
+	// Reopen buzzer if any player still hasn't had a chance; otherwise wait for admin.
 	if room.HasRemainingBuzzers() {
 		room.ReopenBuzzerPhase()
 		ro.wsHandler.BroadcastGameState()
 		ro.wsHandler.BroadcastBuzzerOpen()
 	} else {
-		room.MarkQuestionPlayed(q.ID)
-		ro.wsHandler.BroadcastBoardUpdate(q.ID)
-		room.SetCurrentQuestion(nil)
+		// All buzzers exhausted — admin decides when to reveal answer and close.
+		room.SetPhase(game.PhaseQuestionDone)
 		ro.wsHandler.BroadcastGameState()
-
-		if room.AllQuestionsPlayed() {
-			room.SetPhase(game.PhaseGameOver)
-			snap := room.Snapshot()
-			ro.wsHandler.BroadcastGameOver(snap.Scores)
-		} else {
-			room.NextActivePlayer()
-			room.SetPhase(game.PhaseQuestionOpen)
-			if active := room.ActivePlayer(); active != nil {
-				ro.wsHandler.BroadcastActivePlayer(active)
-			}
-		}
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"delta": delta, "newScore": newScore})
@@ -359,4 +345,52 @@ func (ro *Router) handlePlayerRoutes(w http.ResponseWriter, r *http.Request, roo
 	}
 
 	writeError(w, http.StatusNotFound, "not found")
+}
+
+// POST /api/rooms/:code/question/close
+// Admin closes the active question and advances turn / checks game over.
+func (ro *Router) handleCloseQuestion(w http.ResponseWriter, _ *http.Request, room *game.Room) {
+	q := room.GetCurrentQuestion()
+	if q != nil {
+		room.MarkQuestionPlayed(q.ID)
+		ro.wsHandler.BroadcastBoardUpdate(q.ID)
+		room.SetCurrentQuestion(nil)
+	}
+
+	if room.AllQuestionsPlayed() {
+		room.SetPhase(game.PhaseGameOver)
+		snap := room.Snapshot()
+		ro.wsHandler.BroadcastGameOver(snap.Scores)
+	} else {
+		room.NextActivePlayer()
+		room.SetPhase(game.PhaseQuestionOpen)
+		ro.wsHandler.BroadcastGameState()
+		if active := room.ActivePlayer(); active != nil {
+			ro.wsHandler.BroadcastActivePlayer(active)
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// POST /api/rooms/:code/question/reveal
+// Admin broadcasts the answer text to all players.
+func (ro *Router) handleRevealAnswer(w http.ResponseWriter, _ *http.Request, room *game.Room) {
+	answer := ""
+	if q := room.GetCurrentQuestion(); q != nil {
+		answer = q.Answer
+	}
+	ro.wsHandler.BroadcastAnswerRevealed(answer)
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// POST /api/rooms/:code/question/end-buzzer
+// Admin ends the buzzer phase early; question stays open for answer reveal.
+func (ro *Router) handleEndBuzzerPhase(w http.ResponseWriter, _ *http.Request, room *game.Room) {
+	if room.GetPhase() != game.PhaseBuzzerPhase {
+		writeError(w, http.StatusBadRequest, "not in buzzer phase")
+		return
+	}
+	room.SetPhase(game.PhaseQuestionDone)
+	ro.wsHandler.BroadcastGameState()
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }

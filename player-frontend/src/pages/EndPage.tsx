@@ -8,7 +8,7 @@ export default function EndPage() {
 
   const scores = finalScores.length > 0 ? finalScores : players;
   const sorted = [...scores].sort((a, b) => b.score - a.score);
-  const winner = sorted[0];
+  const myRank = sorted.findIndex((p) => p.id === myPlayerId) + 1;
 
   function handleNewGame() {
     disconnect();
@@ -24,35 +24,42 @@ export default function EndPage() {
 
   return (
     <div className="end-page">
-      <div className="end-card">
-        <div className="trophy">🏆</div>
-        <h1 className="end-title">Spiel vorbei!</h1>
+      <div className="end-trophy">🏆</div>
+      <h1 className="end-title">Spiel vorbei!</h1>
+      {myRank === 1 ? (
+        <p className="end-rank-msg winner">Glückwunsch — du hast gewonnen!</p>
+      ) : (
+        <p className="end-rank-msg">
+          Du hast Platz <strong>#{myRank}</strong> erreicht
+        </p>
+      )}
 
-        {winner && (
-          <p className="winner-announce">
-            Gewinner: <strong>{winner.name}</strong> mit {winner.score} Punkten
-          </p>
-        )}
-
-        <ol className="end-scores">
-          {sorted.map((p, i) => (
-            <li
+      <div className="end-scores">
+        {sorted.map((p, i) => {
+          const isMe = p.id === myPlayerId;
+          return (
+            <div
               key={p.id}
-              className={`end-score-row ${i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : ''} ${p.id === myPlayerId ? 'is-me' : ''}`}
+              className={`end-score-item ${i === 0 ? 'winner' : ''} ${isMe ? 'is-me' : ''}`}
+              style={{ animationDelay: `${i * 0.1}s` }}
             >
               <span className="end-rank">
                 {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}
               </span>
+              <div className={`end-avatar ${isMe ? 'is-me' : 'other'}`}>{p.name[0]}</div>
               <span className="end-name">{p.name}</span>
-              <span className="end-score">{p.score}</span>
-            </li>
-          ))}
-        </ol>
-
-        <button className="join-btn" onClick={handleNewGame}>
-          Neues Spiel
-        </button>
+              {isMe && <span className="end-me-badge">du</span>}
+              <span className={`end-score-value ${p.score < 0 ? 'negative' : 'positive'}`}>
+                {p.score}<span className="end-score-unit">Pts</span>
+              </span>
+            </div>
+          );
+        })}
       </div>
+
+      <button className="end-restart-btn" onClick={handleNewGame}>
+        Neues Spiel
+      </button>
     </div>
   );
 }

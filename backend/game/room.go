@@ -16,6 +16,7 @@ const (
 	PhaseQuestionOpen          GamePhase = "QUESTION_OPEN"
 	PhaseActivePlayerAnswering GamePhase = "ACTIVE_PLAYER_ANSWERING"
 	PhaseBuzzerPhase           GamePhase = "BUZZER_PHASE"
+	PhaseQuestionDone          GamePhase = "QUESTION_DONE"
 	PhaseGameOver              GamePhase = "GAME_OVER"
 )
 
