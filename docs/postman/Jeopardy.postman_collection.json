@@ -1,0 +1,368 @@
+{
+  "info": {
+    "name": "Jeopardy Backend",
+    "_postman_id": "jeopardy-backend-collection",
+    "description": "Testet alle REST-Endpunkte des Jeopardy-Backends. Reihenfolge: 1) Room erstellen → 2) Quiz hochladen → 3) WS verbinden → 4) Spiel starten → ...",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [],
+  "item": [
+    {
+      "name": "01 — Room erstellen",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const res = pm.response.json();",
+              "pm.collectionVariables.set('roomCode', res.code);",
+              "pm.test('Status 201', () => pm.response.to.have.status(201));",
+              "pm.test('Hat room code', () => pm.expect(res.code).to.be.a('string').with.lengthOf(6));"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/rooms",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "rooms"]
+        }
+      }
+    },
+    {
+      "name": "02 — Room-State abrufen",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "const res = pm.response.json();",
+              "pm.test('Phase ist LOBBY', () => pm.expect(res.currentPhase).to.eql('LOBBY'));",
+              "pm.test('Kein Board (noch kein Quiz)', () => pm.expect(res.board).to.be.an('array'));"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/rooms/{{roomCode}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "rooms", "{{roomCode}}"]
+        }
+      }
+    },
+    {
+      "name": "03 — Quiz hochladen",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Status ok', () => pm.expect(pm.response.json().status).to.eql('ok'));"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "[\n  {\n    \"id\": \"cat-1\",\n    \"name\": \"Geographie\",\n    \"questions\": [\n      {\n        \"id\": \"q-1\",\n        \"categoryId\": \"cat-1\",\n        \"points\": 200,\n        \"text\": \"Die Hauptstadt von Frankreich?\"\n      },\n      {\n        \"id\": \"q-2\",\n        \"categoryId\": \"cat-1\",\n        \"points\": 400,\n        \"text\": \"Auf welchem Kontinent liegt Ägypten?\"\n      },\n      {\n        \"id\": \"q-3\",\n        \"categoryId\": \"cat-1\",\n        \"points\": 600,\n        \"text\": \"Welcher Fluss ist der längste der Welt?\"\n      }\n    ]\n  },\n  {\n    \"id\": \"cat-2\",\n    \"name\": \"Wissenschaft\",\n    \"questions\": [\n      {\n        \"id\": \"q-4\",\n        \"categoryId\": \"cat-2\",\n        \"points\": 200,\n        \"text\": \"Was ist H2O?\"\n      },\n      {\n        \"id\": \"q-5\",\n        \"categoryId\": \"cat-2\",\n        \"points\": 400,\n        \"text\": \"Wie viele Planeten hat unser Sonnensystem?\"\n      }\n    ]\n  }\n]"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/rooms/{{roomCode}}/quiz",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "rooms", "{{roomCode}}", "quiz"]
+        }
+      }
+    },
+    {
+      "name": "04 — Quiz exportieren",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Ist Array', () => pm.expect(pm.response.json()).to.be.an('array'));",
+              "pm.test('Hat 2 Kategorien', () => pm.expect(pm.response.json()).to.have.lengthOf(2));"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/rooms/{{roomCode}}/export",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "rooms", "{{roomCode}}", "export"]
+        }
+      }
+    },
+    {
+      "name": "05 — Spiel starten (ohne Spieler → soll 400)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 400 (keine Spieler)', () => pm.response.to.have.status(400));"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/rooms/{{roomCode}}/start",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "rooms", "{{roomCode}}", "start"]
+        }
+      }
+    },
+    {
+      "name": "06 — Spielerreihenfolge setzen",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// playerOrder wird nach WS-Join via collectionVariables gesetzt.",
+              "// Für reinen REST-Test kannst du die IDs manuell aus Request 02 kopieren."
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200 oder 400', () => {",
+              "  pm.expect([200, 400]).to.include(pm.response.code);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "[\"{{playerId1}}\", \"{{playerId2}}\"]"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/rooms/{{roomCode}}/players/order",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "rooms", "{{roomCode}}", "players", "order"]
+        }
+      }
+    },
+    {
+      "name": "07 — Spieler-Reihenfolge würfeln",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/rooms/{{roomCode}}/players/shuffle",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "rooms", "{{roomCode}}", "players", "shuffle"]
+        }
+      }
+    },
+    {
+      "name": "08 — Score manuell setzen",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200 oder 404', () => {",
+              "  pm.expect([200, 404]).to.include(pm.response.code);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{ \"score\": 1000 }"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/rooms/{{roomCode}}/players/{{playerId1}}/score",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "rooms", "{{roomCode}}", "players", "{{playerId1}}", "score"]
+        }
+      }
+    },
+    {
+      "name": "09 — Frage öffnen (erfordert laufendes Spiel)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200 oder 400', () => {",
+              "  pm.expect([200, 400]).to.include(pm.response.code);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/rooms/{{roomCode}}/question/{{questionId}}/open",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "rooms", "{{roomCode}}", "question", "{{questionId}}", "open"]
+        }
+      }
+    },
+    {
+      "name": "10 — Antwort bewerten (richtig)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200 oder 400', () => {",
+              "  pm.expect([200, 400]).to.include(pm.response.code);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{ \"playerId\": \"{{playerId1}}\", \"correct\": true }"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/rooms/{{roomCode}}/answer",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "rooms", "{{roomCode}}", "answer"]
+        }
+      }
+    },
+    {
+      "name": "10b — Antwort bewerten (falsch)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{ \"playerId\": \"{{playerId1}}\", \"correct\": false }"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/rooms/{{roomCode}}/answer",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "rooms", "{{roomCode}}", "answer"]
+        }
+      }
+    },
+    {
+      "name": "11 — Media Upload (Bild)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Hat url-Feld', () => pm.expect(pm.response.json()).to.have.property('url'));"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": [],
+              "description": "Wähle eine JPG/PNG/GIF/WebP-Datei aus"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/media/upload",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "media", "upload"]
+        }
+      }
+    },
+    {
+      "name": "12 — Ungültiger Room-Code (soll 404)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 404', () => pm.response.to.have.status(404));"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/rooms/XXXXXX",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "rooms", "XXXXXX"]
+        }
+      }
+    }
+  ]
+}

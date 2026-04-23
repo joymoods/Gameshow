@@ -1,0 +1,149 @@
+package ws
+
+import (
+	"context"
+	"encoding/json"
+	"log"
+	"sync"
+
+	"nhooyr.io/websocket"
+	"nhooyr.io/websocket/wsjson"
+)
+
+// Client represents a connected WebSocket client.
+type Client struct {
+	ID       string
+	PlayerID string
+	RoomCode string // room the player joined — stays valid even after room replacement
+	IsAdmin  bool
+	conn     *websocket.Conn
+	send     chan OutgoingMessage
+	hub      *Hub
+}
+
+// Hub manages all connected clients and broadcasting.
+type Hub struct {
+	mu      sync.RWMutex
+	clients map[string]*Client // keyed by Client.ID
+	admin   *Client
+}
+
+func NewHub() *Hub {
+	return &Hub{
+		clients: make(map[string]*Client),
+	}
+}
+
+func (h *Hub) Register(c *Client) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.clients[c.ID] = c
+	if c.IsAdmin {
+		h.admin = c
+	}
+}
+
+func (h *Hub) Unregister(c *Client) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	delete(h.clients, c.ID)
+	if c.IsAdmin && h.admin == c {
+		h.admin = nil
+	}
+}
+
+// Broadcast sends a message to all connected clients.
+func (h *Hub) Broadcast(msg OutgoingMessage) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for _, c := range h.clients {
+		select {
+		case c.send <- msg:
+		default:
+			log.Printf("send buffer full for client %s, dropping message", c.ID)
+		}
+	}
+}
+
+// SendToAdmin sends a message only to the admin client.
+func (h *Hub) SendToAdmin(msg OutgoingMessage) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	if h.admin != nil {
+		select {
+		case h.admin.send <- msg:
+		default:
+			log.Printf("send buffer full for admin, dropping message")
+		}
+	}
+}
+
+// ResetPlayerClients clears PlayerID/RoomCode on all non-admin clients and
+// sends them a ROOM_RESET so they know to return to the join screen.
+func (h *Hub) ResetPlayerClients() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for _, c := range h.clients {
+		if c.IsAdmin {
+			continue
+		}
+		c.PlayerID = ""
+		c.RoomCode = ""
+		select {
+		case c.send <- OutgoingMessage{Type: MsgRoomReset, Payload: map[string]any{}}:
+		default:
+		}
+	}
+}
+
+// SendToClient sends a message to a specific client by player ID.
+func (h *Hub) SendToClient(playerID string, msg OutgoingMessage) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for _, c := range h.clients {
+		if c.PlayerID == playerID {
+			select {
+			case c.send <- msg:
+			default:
+			}
+			return
+		}
+	}
+}
+
+// writePump sends queued messages to the WebSocket connection.
+func (c *Client) writePump(ctx context.Context) {
+	defer c.conn.Close(websocket.StatusNormalClosure, "")
+	for {
+		select {
+		case msg, ok := <-c.send:
+			if !ok {
+				return
+			}
+			if err := wsjson.Write(ctx, c.conn, msg); err != nil {
+				log.Printf("write error for client %s: %v", c.ID, err)
+				return
+			}
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+// Send enqueues a message for this client.
+func (c *Client) Send(msg OutgoingMessage) {
+	select {
+	case c.send <- msg:
+	default:
+		log.Printf("send buffer full for client %s", c.ID)
+	}
+}
+
+// SendJSON is a convenience helper for sending directly (used in handler).
+func SendJSON(ctx context.Context, conn *websocket.Conn, v any) error {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	return conn.Write(ctx, websocket.MessageText, data)
+}
