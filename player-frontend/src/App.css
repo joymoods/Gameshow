@@ -575,7 +575,7 @@ input { font-family: inherit; outline: none; transition: border-color 0.2s, box-
 .overlay-status-text { font-weight: 600; font-size: 15px; }
 
 /* Buzzer */
-.buzzer-wrapper { margin-top: 12px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.buzzer-wrapper { position: absolute; top: 20px; right: 24px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .buzzer-relative { position: relative; }
 .buzzer-ping {
   position: absolute;

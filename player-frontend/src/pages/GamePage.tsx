@@ -246,6 +246,33 @@ export default function GamePage() {
       {/* Question overlay */}
       {showOverlay && (
         <div className="question-overlay">
+          {/* Buzzer — absolute top-right */}
+          {showBuzzerSection && (
+            <div className="buzzer-wrapper">
+              <div className="buzzer-relative">
+                {overlayPhase === 'buzzer' && !hasBuzzed && <div className="buzzer-ping" />}
+                <button
+                  className={`buzzer-btn ${buzzerClass}`}
+                  onPointerDown={handleBuzz}
+                  disabled={overlayPhase !== 'buzzer' || hasBuzzed}
+                >
+                  {overlayPhase === 'buzzed-me' ? (
+                    <><span style={{ fontSize: 34 }}>🔔</span><span className="buzzer-sublabel">Gebuzzert!</span></>
+                  ) : overlayPhase === 'buzzed-other' ? (
+                    <><span style={{ fontSize: 28, opacity: 0.3 }}>🔔</span><span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Vergeben</span></>
+                  ) : (
+                    <span className="buzzer-label">BUZZ</span>
+                  )}
+                </button>
+              </div>
+              {overlayPhase === 'buzzer' && !hasBuzzed && (
+                <div className="buzzer-hint">
+                  <kbd>Leertaste</kbd>
+                  <span>oder Button drücken</span>
+                </div>
+              )}
+            </div>
+          )}
           <div className="overlay-question-area">
             {/* Main card — wraps question, status and answer */}
             <div className={`overlay-main-card ${feedbackClass}`}>
@@ -288,33 +315,6 @@ export default function GamePage() {
               )}
             </div>
 
-            {/* Buzzer — outside the main card */}
-            {showBuzzerSection && (
-              <div className="buzzer-wrapper">
-                <div className="buzzer-relative">
-                  {overlayPhase === 'buzzer' && !hasBuzzed && <div className="buzzer-ping" />}
-                  <button
-                    className={`buzzer-btn ${buzzerClass}`}
-                    onPointerDown={handleBuzz}
-                    disabled={overlayPhase !== 'buzzer' || hasBuzzed}
-                  >
-                    {overlayPhase === 'buzzed-me' ? (
-                      <><span style={{ fontSize: 34 }}>🔔</span><span className="buzzer-sublabel">Gebuzzert!</span></>
-                    ) : overlayPhase === 'buzzed-other' ? (
-                      <><span style={{ fontSize: 28, opacity: 0.3 }}>🔔</span><span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Vergeben</span></>
-                    ) : (
-                      <span className="buzzer-label">BUZZ</span>
-                    )}
-                  </button>
-                </div>
-                {overlayPhase === 'buzzer' && !hasBuzzed && (
-                  <div className="buzzer-hint">
-                    <kbd>Leertaste</kbd>
-                    <span>oder Button drücken</span>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
 
           {/* Mini leaderboard */}
