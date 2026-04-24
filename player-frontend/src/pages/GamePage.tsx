@@ -26,6 +26,7 @@ export default function GamePage() {
     buzzerOpen, hasBuzzed,
     buzzedPlayerId, buzzedPlayerName,
     roomReset, clearRoomReset, roomCode,
+    revealedAnswer,
   } = useGameStore();
 
   const [deltas, setDeltas] = useState<Record<string, ScoreDelta>>({});
@@ -89,7 +90,7 @@ export default function GamePage() {
   const iBuzzed = hasBuzzed && buzzedPlayerId === myPlayerId;
   const otherBuzzed = buzzedPlayerId && buzzedPlayerId !== myPlayerId;
 
-  type OverlayPhase = 'answering-me' | 'answering-other' | 'buzzer' | 'buzzed-me' | 'buzzed-other';
+  type OverlayPhase = 'answering-me' | 'answering-other' | 'buzzer' | 'buzzed-me' | 'buzzed-other' | 'question-done';
   let overlayPhase: OverlayPhase = 'answering-other';
   if (phase === 'ACTIVE_PLAYER_ANSWERING') {
     overlayPhase = amActive ? 'answering-me' : 'answering-other';
@@ -98,6 +99,8 @@ export default function GamePage() {
     else if (otherBuzzed) overlayPhase = 'buzzed-other';
     else if (buzzerOpen) overlayPhase = 'buzzer';
     else overlayPhase = 'buzzed-other';
+  } else if (phase === 'QUESTION_DONE') {
+    overlayPhase = 'question-done';
   }
 
   const statusConfigs: Record<OverlayPhase, { color: string; icon: string; text: string }> = {
@@ -106,6 +109,7 @@ export default function GamePage() {
     'buzzer':          { color: 'var(--gold)', icon: '🔔', text: 'Jetzt buzzern! Wer zuerst drückt, darf antworten.' },
     'buzzed-me':       { color: 'var(--gold)', icon: '🔔', text: 'Du hast gebuzzert! Antworte dem Moderator.' },
     'buzzed-other':    { color: 'var(--text-muted)', icon: '🔔', text: `${buzzedPlayerName ?? '…'} hat gebuzzert.` },
+    'question-done':   { color: 'var(--primary)', icon: '✅', text: revealedAnswer ? 'Lösung:' : 'Warte auf den Moderator…' },
   };
   const statusCfg = statusConfigs[overlayPhase];
 
@@ -117,7 +121,7 @@ export default function GamePage() {
     ? 'taken'
     : 'inactive';
 
-  const showBuzzerSection = overlayPhase === 'buzzer' || overlayPhase === 'buzzed-me' || overlayPhase === 'buzzed-other';
+  const showBuzzerSection = (overlayPhase === 'buzzer' || overlayPhase === 'buzzed-me' || overlayPhase === 'buzzed-other') && phase !== 'QUESTION_DONE';
 
   const numRows = board[0]?.questions.length ?? 5;
 
@@ -218,28 +222,31 @@ export default function GamePage() {
       {showOverlay && (
         <div className="question-overlay">
           <div className="overlay-question-area">
-            {/* Meta */}
-            <div className="overlay-meta">
-              <span className="overlay-category">{currentQuestion!.category}</span>
-              <div className="overlay-points-badge">
-                <span className="overlay-points-value">{currentQuestion!.points}</span>
-                <span className="overlay-points-unit">Punkte</span>
+            {/* Question card */}
+            <div className="overlay-question-card">
+              {/* Meta */}
+              <div className="overlay-meta">
+                <span className="overlay-category">{currentQuestion!.category}</span>
+                <div className="overlay-points-badge">
+                  <span className="overlay-points-value">{currentQuestion!.points}</span>
+                  <span className="overlay-points-unit">Punkte</span>
+                </div>
               </div>
+
+              {/* Question text */}
+              <h2 className="overlay-question-text">{currentQuestion!.text}</h2>
+
+              {/* Media */}
+              {mediaUrl(currentQuestion!.imageUrl) && (
+                <img src={mediaUrl(currentQuestion!.imageUrl)} alt="" style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 8 }} />
+              )}
+              {mediaUrl(currentQuestion!.audioUrl) && (
+                <audio src={mediaUrl(currentQuestion!.audioUrl)} controls autoPlay />
+              )}
+              {mediaUrl(currentQuestion!.videoUrl) && (
+                <video src={mediaUrl(currentQuestion!.videoUrl)} controls autoPlay style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 8 }} />
+              )}
             </div>
-
-            {/* Question text */}
-            <h2 className="overlay-question-text">{currentQuestion!.text}</h2>
-
-            {/* Media */}
-            {mediaUrl(currentQuestion!.imageUrl) && (
-              <img src={mediaUrl(currentQuestion!.imageUrl)} alt="" style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 8 }} />
-            )}
-            {mediaUrl(currentQuestion!.audioUrl) && (
-              <audio src={mediaUrl(currentQuestion!.audioUrl)} controls autoPlay />
-            )}
-            {mediaUrl(currentQuestion!.videoUrl) && (
-              <video src={mediaUrl(currentQuestion!.videoUrl)} controls autoPlay style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 8 }} />
-            )}
 
             {/* Status banner */}
             <div
@@ -249,6 +256,11 @@ export default function GamePage() {
               <span className="overlay-status-icon">{statusCfg.icon}</span>
               <span className="overlay-status-text" style={{ color: statusCfg.color }}>{statusCfg.text}</span>
             </div>
+
+            {/* Revealed answer */}
+            {revealedAnswer && (
+              <div className="overlay-revealed-answer">{revealedAnswer}</div>
+            )}
 
             {/* Buzzer */}
             {showBuzzerSection && (
