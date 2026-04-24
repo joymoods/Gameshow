@@ -15,13 +15,17 @@
   --radius: 8px;
 }
 
+html, body {
+  width: 100%;
+  height: 100%;
+}
+
 body {
   background: var(--bg);
   color: var(--text);
   font-family: 'Outfit', system-ui, sans-serif;
   font-size: 15px;
   line-height: 1.5;
-  min-height: 100vh;
   overflow: hidden;
 }
 
