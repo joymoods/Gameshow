@@ -46,6 +46,9 @@ interface GameState {
   // Revealed answer (broadcast by admin)
   revealedAnswer: string | null;
 
+  // Last answer judgment (correct/wrong)
+  lastAnswerResult: { playerId: string; correct: boolean } | null;
+
   // Room was replaced by admin — player must rejoin
   roomReset: boolean;
 
@@ -74,6 +77,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   buzzedPlayerName: null,
   finalScores: [],
   revealedAnswer: null,
+  lastAnswerResult: null,
   roomReset: false,
 
   setConnected: (connected) => set({ connected }),
@@ -122,6 +126,7 @@ export const useGameStore = create<GameState>((set, get) => ({
           buzzedPlayerId: null,
           buzzedPlayerName: null,
           revealedAnswer: null,
+          lastAnswerResult: null,
         });
         break;
       }
@@ -168,6 +173,7 @@ export const useGameStore = create<GameState>((set, get) => ({
             pl.id === p.playerId ? { ...pl, score: p.newScore } : pl
           ),
           buzzerOpen: false,
+          lastAnswerResult: { playerId: p.playerId, correct: p.correct },
         }));
         break;
       }

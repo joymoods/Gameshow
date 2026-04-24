@@ -44,6 +44,8 @@ input { font-family: inherit; outline: none; transition: border-color 0.2s, box-
 @keyframes buzzShake   { 0%, 100% { transform: scale(1) rotate(0); } 20% { transform: scale(1.07) rotate(-2deg); } 40% { transform: scale(1.07) rotate(2deg); } 70% { transform: scale(1.03) rotate(-1deg); } }
 @keyframes rankIn      { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
 @keyframes ping        { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(2.5); opacity: 0; } }
+@keyframes flashGreen  { 0% { background: var(--surface); } 35% { background: rgba(34,197,94,0.18); } 100% { background: var(--surface); } }
+@keyframes flashRed    { 0% { background: var(--surface); } 35% { background: rgba(239,68,68,0.18); } 100% { background: var(--surface); } }
 
 /* ---- Join Page ---- */
 .join-page {
@@ -478,7 +480,8 @@ input { font-family: inherit; outline: none; transition: border-color 0.2s, box-
   justify-content: center;
   gap: 14px;
 }
-.overlay-question-card {
+/* Main card — unified border around question + status + answer */
+.overlay-main-card {
   width: 100%;
   max-width: 660px;
   background: var(--surface);
@@ -490,10 +493,41 @@ input { font-family: inherit; outline: none; transition: border-color 0.2s, box-
   align-items: center;
   gap: 14px;
   box-shadow: 0 4px 32px rgba(0,0,0,0.4);
+  transition: border-color 0.3s ease;
 }
+.overlay-main-card.feedback-correct {
+  border-color: var(--success);
+  box-shadow: 0 0 0 4px rgba(34,197,94,0.15), 0 4px 32px rgba(0,0,0,0.4);
+  animation: flashGreen 0.7s ease forwards;
+}
+.overlay-main-card.feedback-correct-stay {
+  border-color: var(--success);
+  box-shadow: 0 0 0 4px rgba(34,197,94,0.12), 0 4px 32px rgba(0,0,0,0.4);
+}
+.overlay-main-card.feedback-wrong {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 4px rgba(239,68,68,0.15), 0 4px 32px rgba(0,0,0,0.4);
+  animation: flashRed 0.9s ease forwards;
+}
+
+/* Question content inside the main card (no own border) */
+.overlay-question-content {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.overlay-divider {
+  width: 100%;
+  height: 1px;
+  background: var(--border);
+  border-radius: 1px;
+}
+
 .overlay-revealed-answer {
   width: 100%;
-  max-width: 660px;
   background: rgba(79,110,247,0.08);
   border: 2px solid rgba(79,110,247,0.35);
   border-radius: 12px;

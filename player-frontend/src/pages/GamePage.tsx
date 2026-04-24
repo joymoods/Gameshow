@@ -27,16 +27,39 @@ export default function GamePage() {
     buzzedPlayerId, buzzedPlayerName,
     roomReset, clearRoomReset, roomCode,
     revealedAnswer,
+    lastAnswerResult,
   } = useGameStore();
 
   const [deltas, setDeltas] = useState<Record<string, ScoreDelta>>({});
   const prevScores = useRef<Record<string, number>>({});
+
+  type AnswerFeedback = 'correct' | 'wrong' | 'correct-stay' | null;
+  const [answerFeedback, setAnswerFeedback] = useState<AnswerFeedback>(null);
 
   useEffect(() => {
     if (roomReset) { clearRoomReset(); navigate('/'); return; }
     if (phase === 'LOBBY') navigate('/waiting');
     if (phase === 'GAME_OVER') navigate('/end');
   }, [phase, roomReset, navigate, clearRoomReset]);
+
+  // Reset feedback when a new question opens
+  useEffect(() => {
+    setAnswerFeedback(null);
+  }, [currentQuestion?.questionId]);
+
+  // Handle answer result feedback animation
+  useEffect(() => {
+    if (!lastAnswerResult) { setAnswerFeedback(null); return; }
+    if (lastAnswerResult.correct) {
+      setAnswerFeedback('correct');
+      const t = setTimeout(() => setAnswerFeedback('correct-stay'), 700);
+      return () => clearTimeout(t);
+    } else {
+      setAnswerFeedback('wrong');
+      const t = setTimeout(() => setAnswerFeedback(null), 900);
+      return () => clearTimeout(t);
+    }
+  }, [lastAnswerResult]);
 
   // Detect score changes and trigger delta animation
   useEffect(() => {
@@ -83,6 +106,8 @@ export default function GamePage() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [buzzerOpen, hasBuzzed]);
+
+  const feedbackClass = answerFeedback ? `feedback-${answerFeedback}` : '';
 
   // Phase-aware overlay state
   const showOverlay = currentQuestion !== null;
@@ -222,47 +247,48 @@ export default function GamePage() {
       {showOverlay && (
         <div className="question-overlay">
           <div className="overlay-question-area">
-            {/* Question card */}
-            <div className="overlay-question-card">
-              {/* Meta */}
-              <div className="overlay-meta">
-                <span className="overlay-category">{currentQuestion!.category}</span>
-                <div className="overlay-points-badge">
-                  <span className="overlay-points-value">{currentQuestion!.points}</span>
-                  <span className="overlay-points-unit">Punkte</span>
+            {/* Main card — wraps question, status and answer */}
+            <div className={`overlay-main-card ${feedbackClass}`}>
+              {/* Question content */}
+              <div className="overlay-question-content">
+                <div className="overlay-meta">
+                  <span className="overlay-category">{currentQuestion!.category}</span>
+                  <div className="overlay-points-badge">
+                    <span className="overlay-points-value">{currentQuestion!.points}</span>
+                    <span className="overlay-points-unit">Punkte</span>
+                  </div>
                 </div>
+                <h2 className="overlay-question-text">{currentQuestion!.text}</h2>
+                {mediaUrl(currentQuestion!.imageUrl) && (
+                  <img src={mediaUrl(currentQuestion!.imageUrl)} alt="" style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 8 }} />
+                )}
+                {mediaUrl(currentQuestion!.audioUrl) && (
+                  <audio src={mediaUrl(currentQuestion!.audioUrl)} controls autoPlay />
+                )}
+                {mediaUrl(currentQuestion!.videoUrl) && (
+                  <video src={mediaUrl(currentQuestion!.videoUrl)} controls autoPlay style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 8 }} />
+                )}
               </div>
 
-              {/* Question text */}
-              <h2 className="overlay-question-text">{currentQuestion!.text}</h2>
+              {/* Divider */}
+              <div className="overlay-divider" />
 
-              {/* Media */}
-              {mediaUrl(currentQuestion!.imageUrl) && (
-                <img src={mediaUrl(currentQuestion!.imageUrl)} alt="" style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 8 }} />
-              )}
-              {mediaUrl(currentQuestion!.audioUrl) && (
-                <audio src={mediaUrl(currentQuestion!.audioUrl)} controls autoPlay />
-              )}
-              {mediaUrl(currentQuestion!.videoUrl) && (
-                <video src={mediaUrl(currentQuestion!.videoUrl)} controls autoPlay style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 8 }} />
+              {/* Status banner */}
+              <div
+                className="overlay-status-banner"
+                style={{ background: `${statusCfg.color}12`, border: `1px solid ${statusCfg.color}30` }}
+              >
+                <span className="overlay-status-icon">{statusCfg.icon}</span>
+                <span className="overlay-status-text" style={{ color: statusCfg.color }}>{statusCfg.text}</span>
+              </div>
+
+              {/* Revealed answer */}
+              {revealedAnswer && (
+                <div className="overlay-revealed-answer">{revealedAnswer}</div>
               )}
             </div>
 
-            {/* Status banner */}
-            <div
-              className="overlay-status-banner"
-              style={{ background: `${statusCfg.color}12`, border: `1px solid ${statusCfg.color}30` }}
-            >
-              <span className="overlay-status-icon">{statusCfg.icon}</span>
-              <span className="overlay-status-text" style={{ color: statusCfg.color }}>{statusCfg.text}</span>
-            </div>
-
-            {/* Revealed answer */}
-            {revealedAnswer && (
-              <div className="overlay-revealed-answer">{revealedAnswer}</div>
-            )}
-
-            {/* Buzzer */}
+            {/* Buzzer — outside the main card */}
             {showBuzzerSection && (
               <div className="buzzer-wrapper">
                 <div className="buzzer-relative">
