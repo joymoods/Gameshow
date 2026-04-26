@@ -6,7 +6,8 @@ import (
 	"net/http"
 	"strings"
 
-	"jeopardy/game"
+	"games/game"
+	"games/game/core"
 
 	"github.com/google/uuid"
 	"nhooyr.io/websocket"
@@ -46,10 +47,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		h.hub.Unregister(c)
 		if c.PlayerID != "" && c.RoomCode != "" {
-			// Use the room the player actually joined — not the current room,
-			// which may have been replaced by a new admin session.
-			room := h.manager.GetRoomByCode(c.RoomCode)
-			if room != nil {
+			room, ok := h.manager.GetRoom(c.RoomCode)
+			if ok {
 				room.RemovePlayer(c.PlayerID)
 				h.hub.SendToAdmin(OutgoingMessage{
 					Type:    MsgPlayerLeft,
@@ -63,12 +62,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	go c.writePump(ctx)
-
-	// Send current state on connect
-	room := h.manager.GetRoom()
-	if room != nil {
-		c.Send(buildGameState(room))
-	}
 
 	// Read loop
 	for {
@@ -104,8 +97,8 @@ func (h *Handler) handleJoinGame(c *Client, payload map[string]any) {
 		return
 	}
 
-	room := h.manager.GetRoomByCode(roomCode)
-	if room == nil {
+	room, ok := h.manager.GetRoom(roomCode)
+	if !ok {
 		c.Send(OutgoingMessage{Type: MsgError, Payload: ErrorPayload{Message: "room not found"}})
 		return
 	}
@@ -114,7 +107,6 @@ func (h *Handler) handleJoinGame(c *Client, payload map[string]any) {
 	c.PlayerID = player.ID
 	c.RoomCode = room.Code
 
-	// Broadcast updated state to ALL clients so every waiting player sees the new joiner
 	h.hub.Broadcast(buildGameState(room))
 
 	if isNew {
@@ -125,20 +117,30 @@ func (h *Handler) handleJoinGame(c *Client, payload map[string]any) {
 	}
 }
 
+// handleBuzz delegates the buzz attempt to the game via HandlePlayerMessage.
+// If the game accepts the buzz (nil error), the handler broadcasts PLAYER_BUZZED
+// using the player info it already has from the client connection.
 func (h *Handler) handleBuzz(c *Client) {
-	if c.PlayerID == "" {
+	if c.PlayerID == "" || c.RoomCode == "" {
 		return
 	}
-	room := h.manager.GetRoom()
-	if room == nil {
+	room, ok := h.manager.GetRoom(c.RoomCode)
+	if !ok {
+		return
+	}
+	if room.Game == nil {
 		return
 	}
 
-	player, ok := room.AttemptBuzz(c.PlayerID)
-	if !ok || player == nil {
-		return
+	if err := room.Game.HandlePlayerMessage(c.PlayerID, "BUZZ", map[string]any{}); err != nil {
+		return // buzz rejected (wrong phase, already buzzed, etc.)
 	}
 
+	// Buzz accepted — look up the player for the broadcast payload.
+	player := room.GetPlayer(c.PlayerID)
+	if player == nil {
+		return
+	}
 	h.hub.Broadcast(OutgoingMessage{
 		Type: MsgPlayerBuzzed,
 		Payload: PlayerBuzzedPayload{
@@ -149,6 +151,7 @@ func (h *Handler) handleBuzz(c *Client) {
 }
 
 // buildGameState assembles a GAME_STATE message from the current room.
+// Room.Snapshot() already merges game-specific state (board, currentPhase) from Game.Snapshot().
 func buildGameState(room *game.Room) OutgoingMessage {
 	snap := room.Snapshot()
 	return OutgoingMessage{
@@ -159,20 +162,15 @@ func buildGameState(room *game.Room) OutgoingMessage {
 
 // ---- Exported helpers for REST API handlers to trigger WS messages ----
 
-// ResetPlayerClients sends ROOM_RESET to all player WS clients and clears their session.
 func (h *Handler) ResetPlayerClients() {
 	h.hub.ResetPlayerClients()
 }
 
-func (h *Handler) BroadcastGameState() {
-	room := h.manager.GetRoom()
-	if room == nil {
-		return
-	}
+func (h *Handler) BroadcastGameState(room *game.Room) {
 	h.hub.Broadcast(buildGameState(room))
 }
 
-func (h *Handler) BroadcastQuestionOpened(q *game.Question, categoryName string) {
+func (h *Handler) BroadcastQuestionOpened(q *core.Question, categoryName string) {
 	h.hub.Broadcast(OutgoingMessage{
 		Type: MsgQuestionOpened,
 		Payload: QuestionOpenedPayload{
@@ -187,7 +185,7 @@ func (h *Handler) BroadcastQuestionOpened(q *game.Question, categoryName string)
 	})
 }
 
-func (h *Handler) BroadcastActivePlayer(p *game.Player) {
+func (h *Handler) BroadcastActivePlayer(p *core.Player) {
 	h.hub.Broadcast(OutgoingMessage{
 		Type:    MsgActivePlayer,
 		Payload: ActivePlayerPayload{PlayerID: p.ID, PlayerName: p.Name},
@@ -228,5 +226,12 @@ func (h *Handler) BroadcastGameOver(scores any) {
 	h.hub.Broadcast(OutgoingMessage{
 		Type:    MsgGameOver,
 		Payload: GameOverPayload{FinalScores: scores},
+	})
+}
+
+func (h *Handler) BroadcastGameSwitched(gameType string) {
+	h.hub.Broadcast(OutgoingMessage{
+		Type:    MsgGameSwitched,
+		Payload: GameSwitchedPayload{GameType: gameType},
 	})
 }

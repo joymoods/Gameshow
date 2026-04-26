@@ -1,6 +1,11 @@
-package game
+package jeopardy
 
 import "github.com/google/uuid"
+
+// Question and Category are the jeopardy-package-local copies of the core types.
+// They exist here so that in Phase 6 the core types can be removed and jeopardy
+// becomes fully self-contained. JeopardyGame itself still uses core.Category /
+// core.Question during Phase 2 because it interoperates with the Room and API layer.
 
 type Question struct {
 	ID         string `json:"id"`

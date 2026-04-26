@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"os"
 
-	"jeopardy/api"
-	"jeopardy/game"
-	"jeopardy/media"
-	"jeopardy/ws"
+	"games/api"
+	"games/game"
+	"games/media"
+	"games/ws"
 )
 
 func main() {
@@ -30,19 +30,12 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	// WebSocket endpoint
 	mux.Handle("/ws", wsHandler)
-
-	// REST API
 	apiRouter.Register(mux)
-
-	// Media upload
 	mux.HandleFunc("/api/media/upload", mediaHandler.ServeUpload)
-
-	// Static file server for uploaded media
 	mux.Handle("/media/", http.StripPrefix("/media/", http.FileServer(http.Dir(uploadDir))))
 
-	log.Printf("Jeopardy backend starting on :%s", port)
+	log.Printf("Games backend starting on :%s", port)
 	if err := http.ListenAndServe(":"+port, mux); err != nil {
 		log.Fatal(err)
 	}

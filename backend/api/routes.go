@@ -5,12 +5,14 @@ import (
 	"net/http"
 	"strings"
 
-	"jeopardy/game"
-	"jeopardy/ws"
+	"games/game"
+	"games/game/core"
+	"games/game/jeopardy"
+	"games/ws"
 )
 
 type Router struct {
-	manager *game.Manager
+	manager   *game.Manager
 	wsHandler *ws.Handler
 }
 
@@ -46,22 +48,43 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
 }
 
-// POST /api/rooms → create room
+// GET /api/rooms → list all active rooms
+// POST /api/rooms → create room; body: {"game_type": "jeopardy"}
 func (ro *Router) handleRooms(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
+	switch r.Method {
+	case http.MethodGet:
+		rooms := ro.manager.ListRooms()
+		snapshots := make([]game.RoomSnapshot, 0, len(rooms))
+		for _, room := range rooms {
+			snapshots = append(snapshots, room.Snapshot())
+		}
+		writeJSON(w, http.StatusOK, snapshots)
+
+	case http.MethodPost:
+		var body struct {
+			GameType core.GameType `json:"game_type"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.GameType == "" {
+			writeError(w, http.StatusBadRequest, "game_type is required")
+			return
+		}
+		if body.GameType != core.GameTypeJeopardy {
+			writeError(w, http.StatusBadRequest, "unsupported game_type: "+string(body.GameType))
+			return
+		}
+		ro.wsHandler.ResetPlayerClients()
+		room := ro.manager.CreateRoom()
+		room.GameType = core.GameTypeJeopardy
+		room.Game = jeopardy.New()
+		writeJSON(w, http.StatusCreated, map[string]string{"code": room.Code})
+
+	default:
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
 	}
-	// Notify all currently connected player clients that the room is gone
-	// so they return to the join screen instead of becoming ghost players.
-	ro.wsHandler.ResetPlayerClients()
-	room := ro.manager.CreateRoom()
-	writeJSON(w, http.StatusCreated, map[string]string{"code": room.Code})
 }
 
 // Routes under /api/rooms/:code/...
 func (ro *Router) handleRoomRoutes(w http.ResponseWriter, r *http.Request) {
-	// Strip /api/rooms/
 	path := strings.TrimPrefix(r.URL.Path, "/api/rooms/")
 	parts := strings.SplitN(path, "/", 3)
 
@@ -71,8 +94,8 @@ func (ro *Router) handleRoomRoutes(w http.ResponseWriter, r *http.Request) {
 	}
 
 	code := parts[0]
-	room := ro.manager.GetRoomByCode(code)
-	if room == nil {
+	room, ok := ro.manager.GetRoom(code)
+	if !ok {
 		writeError(w, http.StatusNotFound, "room not found")
 		return
 	}
@@ -80,7 +103,7 @@ func (ro *Router) handleRoomRoutes(w http.ResponseWriter, r *http.Request) {
 	// /api/rooms/:code (GET)
 	if len(parts) == 1 {
 		if r.Method == http.MethodGet {
-			ro.handleGetRoom(w, r, room)
+			writeJSON(w, http.StatusOK, room.Snapshot())
 			return
 		}
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -95,7 +118,6 @@ func (ro *Router) handleRoomRoutes(w http.ResponseWriter, r *http.Request) {
 
 	switch sub {
 	case "quiz":
-		// POST /api/rooms/:code/quiz
 		if r.Method == http.MethodPost {
 			ro.handleUploadQuiz(w, r, room)
 		} else {
@@ -103,7 +125,6 @@ func (ro *Router) handleRoomRoutes(w http.ResponseWriter, r *http.Request) {
 		}
 
 	case "export":
-		// GET /api/rooms/:code/export
 		if r.Method == http.MethodGet {
 			ro.handleExportQuiz(w, r, room)
 		} else {
@@ -111,7 +132,6 @@ func (ro *Router) handleRoomRoutes(w http.ResponseWriter, r *http.Request) {
 		}
 
 	case "start":
-		// POST /api/rooms/:code/start
 		if r.Method == http.MethodPost {
 			ro.handleStartGame(w, r, room)
 		} else {
@@ -119,7 +139,6 @@ func (ro *Router) handleRoomRoutes(w http.ResponseWriter, r *http.Request) {
 		}
 
 	case "end":
-		// POST /api/rooms/:code/end
 		if r.Method == http.MethodPost {
 			ro.handleEndGame(w, r, room)
 		} else {
@@ -145,17 +164,20 @@ func (ro *Router) handleRoomRoutes(w http.ResponseWriter, r *http.Request) {
 		}
 
 	case "answer":
-		// POST /api/rooms/:code/answer
 		if r.Method == http.MethodPost {
 			ro.handleAnswer(w, r, room)
 		} else {
 			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		}
 
+	case "game":
+		if r.Method == http.MethodPost {
+			ro.handleSwitchGame(w, r, room)
+		} else {
+			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		}
+
 	case "players":
-		// POST /api/rooms/:code/players/:id/score
-		// POST /api/rooms/:code/players/order
-		// POST /api/rooms/:code/players/shuffle
 		ro.handlePlayerRoutes(w, r, room, rest)
 
 	default:
@@ -163,20 +185,23 @@ func (ro *Router) handleRoomRoutes(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// GET /api/rooms/:code
-func (ro *Router) handleGetRoom(w http.ResponseWriter, _ *http.Request, room *game.Room) {
-	writeJSON(w, http.StatusOK, room.Snapshot())
-}
-
 // POST /api/rooms/:code/quiz
+// Delegates to HandleAdminCommand("load_quiz") so the game owns the board state.
 func (ro *Router) handleUploadQuiz(w http.ResponseWriter, r *http.Request, room *game.Room) {
-	var categories []game.Category
+	if room.Game == nil {
+		writeError(w, http.StatusBadRequest, "no game initialised")
+		return
+	}
+	var categories []core.Category
 	if err := json.NewDecoder(r.Body).Decode(&categories); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
 		return
 	}
-	room.SetCategories(categories)
-	ro.wsHandler.BroadcastGameState()
+	if _, err := room.Game.HandleAdminCommand("load_quiz", map[string]any{"categories": categories}); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	ro.wsHandler.BroadcastGameState(room)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
@@ -192,9 +217,17 @@ func (ro *Router) handleStartGame(w http.ResponseWriter, r *http.Request, room *
 		writeError(w, http.StatusBadRequest, "no players connected")
 		return
 	}
-	room.SetPhase(game.PhaseQuestionOpen)
+	if room.Game == nil {
+		writeError(w, http.StatusBadRequest, "no game initialised")
+		return
+	}
+	if err := room.Game.OnStart(room); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	room.SetPhase(core.RoomPhaseInProgress)
 	active := room.ActivePlayer()
-	ro.wsHandler.BroadcastGameState()
+	ro.wsHandler.BroadcastGameState(room)
 	if active != nil {
 		ro.wsHandler.BroadcastActivePlayer(active)
 	}
@@ -203,7 +236,7 @@ func (ro *Router) handleStartGame(w http.ResponseWriter, r *http.Request, room *
 
 // POST /api/rooms/:code/end
 func (ro *Router) handleEndGame(w http.ResponseWriter, _ *http.Request, room *game.Room) {
-	room.SetPhase(game.PhaseGameOver)
+	room.SetPhase(core.RoomPhaseGameOver)
 	snap := room.Snapshot()
 	ro.wsHandler.BroadcastGameOver(snap.Scores)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "game_over"})
@@ -211,40 +244,36 @@ func (ro *Router) handleEndGame(w http.ResponseWriter, _ *http.Request, room *ga
 
 // POST /api/rooms/:code/question/:id/open
 func (ro *Router) handleOpenQuestion(w http.ResponseWriter, _ *http.Request, room *game.Room, questionID string) {
-	phase := room.GetPhase()
-	if phase != game.PhaseQuestionOpen {
-		writeError(w, http.StatusBadRequest, "not in QUESTION_OPEN phase")
+	if room.Game == nil {
+		writeError(w, http.StatusBadRequest, "no game initialised")
 		return
 	}
-
-	q := room.GetQuestion(questionID)
-	if q == nil {
-		writeError(w, http.StatusNotFound, "question not found")
+	result, err := room.Game.HandleAdminCommand("open_question", map[string]any{"questionId": questionID})
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if q.Played {
-		writeError(w, http.StatusBadRequest, "question already played")
-		return
+	res := result.(map[string]any)
+	q, _ := res["question"].(*core.Question)
+	catName, _ := res["categoryName"].(string)
+	activePlayer, _ := res["activePlayer"].(*core.Player)
+
+	if q != nil {
+		ro.wsHandler.BroadcastQuestionOpened(q, catName)
 	}
-
-	room.SetCurrentQuestion(q)
-	room.SetPhase(game.PhaseActivePlayerAnswering)
-	room.ResetBuzzedPlayers()
-
-	categoryName := room.GetCategoryName(questionID)
-	ro.wsHandler.BroadcastQuestionOpened(q, categoryName)
-
-	active := room.ActivePlayer()
-	if active != nil {
-		ro.wsHandler.BroadcastActivePlayer(active)
+	if activePlayer != nil {
+		ro.wsHandler.BroadcastActivePlayer(activePlayer)
 	}
-
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 // POST /api/rooms/:code/answer
 // Body: { "playerId": "...", "correct": true/false }
 func (ro *Router) handleAnswer(w http.ResponseWriter, r *http.Request, room *game.Room) {
+	if room.Game == nil {
+		writeError(w, http.StatusBadRequest, "no game initialised")
+		return
+	}
 	var body struct {
 		PlayerID string `json:"playerId"`
 		Correct  bool   `json:"correct"`
@@ -254,47 +283,26 @@ func (ro *Router) handleAnswer(w http.ResponseWriter, r *http.Request, room *gam
 		return
 	}
 
-	q := room.GetCurrentQuestion()
-	if q == nil {
-		writeError(w, http.StatusBadRequest, "no active question")
+	result, err := room.Game.HandleAdminCommand("answer", map[string]any{
+		"playerId": body.PlayerID,
+		"correct":  body.Correct,
+	})
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	res := result.(map[string]any)
+	delta, _ := res["delta"].(int)
+	newScore, _ := res["newScore"].(int)
+	buzzerOpen, _ := res["buzzerOpen"].(bool)
 
-	points := q.Points
-	if body.Correct && room.GetPhase() == game.PhaseBuzzerPhase {
-		points = points / 2
-	}
-	delta, newScore := room.ApplyResult(body.PlayerID, body.Correct, points)
 	ro.wsHandler.BroadcastAnswerResult(body.PlayerID, body.Correct, delta, newScore)
 
-	if body.Correct {
-		// Score applied; question stays open until admin explicitly closes it.
-		room.SetPhase(game.PhaseQuestionDone)
-		ro.wsHandler.BroadcastGameState()
-		writeJSON(w, http.StatusOK, map[string]any{"delta": delta, "newScore": newScore})
-		return
-	}
-
-	// Wrong answer
-	if room.GetPhase() == game.PhaseActivePlayerAnswering {
-		// Exclude active player so they cannot buzz for this question
-		room.OpenBuzzerPhase(body.PlayerID)
-		ro.wsHandler.BroadcastGameState()
-		ro.wsHandler.BroadcastBuzzerOpen()
-		writeJSON(w, http.StatusOK, map[string]any{"delta": delta, "newScore": newScore})
-		return
-	}
-
-	// Wrong answer in buzzer phase — player already recorded in BuzzedPlayers by AttemptBuzz.
-	// Reopen buzzer if any player still hasn't had a chance; otherwise wait for admin.
-	if room.HasRemainingBuzzers() {
-		room.ReopenBuzzerPhase()
-		ro.wsHandler.BroadcastGameState()
+	if buzzerOpen {
+		ro.wsHandler.BroadcastGameState(room)
 		ro.wsHandler.BroadcastBuzzerOpen()
 	} else {
-		// All buzzers exhausted — admin decides when to reveal answer and close.
-		room.SetPhase(game.PhaseQuestionDone)
-		ro.wsHandler.BroadcastGameState()
+		ro.wsHandler.BroadcastGameState(room)
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"delta": delta, "newScore": newScore})
@@ -302,7 +310,6 @@ func (ro *Router) handleAnswer(w http.ResponseWriter, r *http.Request, room *gam
 
 // Player sub-routes
 func (ro *Router) handlePlayerRoutes(w http.ResponseWriter, r *http.Request, room *game.Room, rest string) {
-	// POST /api/rooms/:code/players/order  → set player order
 	if rest == "order" && r.Method == http.MethodPost {
 		var ids []string
 		if err := json.NewDecoder(r.Body).Decode(&ids); err != nil {
@@ -310,21 +317,18 @@ func (ro *Router) handlePlayerRoutes(w http.ResponseWriter, r *http.Request, roo
 			return
 		}
 		room.SetPlayerOrder(ids)
-		ro.wsHandler.BroadcastGameState()
+		ro.wsHandler.BroadcastGameState(room)
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 		return
 	}
 
-	// POST /api/rooms/:code/players/shuffle → shuffle order
 	if rest == "shuffle" && r.Method == http.MethodPost {
 		room.ShufflePlayers()
-		ro.wsHandler.BroadcastGameState()
+		ro.wsHandler.BroadcastGameState(room)
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 		return
 	}
 
-	// POST /api/rooms/:code/players/:id/score → manual score adjustment
-	// rest = ":id/score"
 	parts := strings.SplitN(rest, "/", 2)
 	if len(parts) == 2 && parts[1] == "score" && r.Method == http.MethodPost {
 		playerID := parts[0]
@@ -339,7 +343,7 @@ func (ro *Router) handlePlayerRoutes(w http.ResponseWriter, r *http.Request, roo
 			writeError(w, http.StatusNotFound, "player not found")
 			return
 		}
-		ro.wsHandler.BroadcastGameState()
+		ro.wsHandler.BroadcastGameState(room)
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 		return
 	}
@@ -348,49 +352,88 @@ func (ro *Router) handlePlayerRoutes(w http.ResponseWriter, r *http.Request, roo
 }
 
 // POST /api/rooms/:code/question/close
-// Admin closes the active question and advances turn / checks game over.
 func (ro *Router) handleCloseQuestion(w http.ResponseWriter, _ *http.Request, room *game.Room) {
-	q := room.GetCurrentQuestion()
-	if q != nil {
-		room.MarkQuestionPlayed(q.ID)
-		ro.wsHandler.BroadcastBoardUpdate(q.ID)
-		room.SetCurrentQuestion(nil)
+	if room.Game == nil {
+		writeError(w, http.StatusBadRequest, "no game initialised")
+		return
 	}
+	result, err := room.Game.HandleAdminCommand("close_question", map[string]any{})
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	res := result.(map[string]any)
+	questionID, _ := res["questionId"].(string)
+	gameOver, _ := res["gameOver"].(bool)
+	activePlayer, _ := res["activePlayer"].(*core.Player)
 
-	if room.AllQuestionsPlayed() {
-		room.SetPhase(game.PhaseGameOver)
+	if questionID != "" {
+		ro.wsHandler.BroadcastBoardUpdate(questionID)
+	}
+	if gameOver {
+		room.SetPhase(core.RoomPhaseGameOver)
 		snap := room.Snapshot()
 		ro.wsHandler.BroadcastGameOver(snap.Scores)
 	} else {
-		room.NextActivePlayer()
-		room.SetPhase(game.PhaseQuestionOpen)
-		ro.wsHandler.BroadcastGameState()
-		if active := room.ActivePlayer(); active != nil {
-			ro.wsHandler.BroadcastActivePlayer(active)
+		ro.wsHandler.BroadcastGameState(room)
+		if activePlayer != nil {
+			ro.wsHandler.BroadcastActivePlayer(activePlayer)
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 // POST /api/rooms/:code/question/reveal
-// Admin broadcasts the answer text to all players.
 func (ro *Router) handleRevealAnswer(w http.ResponseWriter, _ *http.Request, room *game.Room) {
-	answer := ""
-	if q := room.GetCurrentQuestion(); q != nil {
-		answer = q.Answer
+	if room.Game == nil {
+		writeError(w, http.StatusBadRequest, "no game initialised")
+		return
 	}
+	result, err := room.Game.HandleAdminCommand("reveal", map[string]any{})
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	answer, _ := result.(map[string]any)["answer"].(string)
 	ro.wsHandler.BroadcastAnswerRevealed(answer)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-// POST /api/rooms/:code/question/end-buzzer
-// Admin ends the buzzer phase early; question stays open for answer reveal.
-func (ro *Router) handleEndBuzzerPhase(w http.ResponseWriter, _ *http.Request, room *game.Room) {
-	if room.GetPhase() != game.PhaseBuzzerPhase {
-		writeError(w, http.StatusBadRequest, "not in buzzer phase")
+// POST /api/rooms/:code/game
+// Switches the game type; only allowed when room is in LOBBY phase.
+func (ro *Router) handleSwitchGame(w http.ResponseWriter, r *http.Request, room *game.Room) {
+	if room.GetPhase() != core.RoomPhaseLobby {
+		writeError(w, http.StatusConflict, "game can only be switched in LOBBY phase")
 		return
 	}
-	room.SetPhase(game.PhaseQuestionDone)
-	ro.wsHandler.BroadcastGameState()
+	var body struct {
+		GameType core.GameType `json:"game_type"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.GameType == "" {
+		writeError(w, http.StatusBadRequest, "game_type is required")
+		return
+	}
+	if body.GameType != core.GameTypeJeopardy {
+		writeError(w, http.StatusBadRequest, "unsupported game_type: "+string(body.GameType))
+		return
+	}
+	room.GameType = body.GameType
+	room.Game = jeopardy.New()
+	ro.wsHandler.BroadcastGameSwitched(string(body.GameType))
+	ro.wsHandler.BroadcastGameState(room)
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// POST /api/rooms/:code/question/end-buzzer
+func (ro *Router) handleEndBuzzerPhase(w http.ResponseWriter, _ *http.Request, room *game.Room) {
+	if room.Game == nil {
+		writeError(w, http.StatusBadRequest, "no game initialised")
+		return
+	}
+	if _, err := room.Game.HandleAdminCommand("end_buzzer", map[string]any{}); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	ro.wsHandler.BroadcastGameState(room)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }

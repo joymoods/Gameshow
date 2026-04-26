@@ -76,6 +76,10 @@ type ErrorPayload struct {
 	Message string `json:"message"`
 }
 
+type GameSwitchedPayload struct {
+	GameType string `json:"game_type"`
+}
+
 // Message type constants
 const (
 	// Client → Server
@@ -102,4 +106,7 @@ const (
 
 	// Server → Player clients only (new room created by admin)
 	MsgRoomReset = "ROOM_RESET"
+
+	// Server → All clients (game type changed in lobby)
+	MsgGameSwitched = "GAME_SWITCHED"
 )
