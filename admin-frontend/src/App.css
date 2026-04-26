@@ -867,6 +867,29 @@ input:focus, textarea:focus, select:focus { border-color: var(--primary); }
 .phase-in_progress { background: rgba(240,180,41,0.15); color: var(--gold); }
 .phase-game_over { background: rgba(239,68,68,0.15); color: var(--danger); }
 .room-card-players { color: var(--text-muted); font-size: 12px; }
+.room-card-wrapper { position: relative; }
+.room-card-wrapper .room-card { width: 100%; }
+.room-card-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(239,68,68,0.15);
+  color: var(--danger);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+}
+.room-card-wrapper:hover .room-card-close { opacity: 1; }
+.room-card-close:hover { background: rgba(239,68,68,0.35); }
 
 /* ---- Modal ---- */
 .modal-backdrop {

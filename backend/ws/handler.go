@@ -166,6 +166,10 @@ func (h *Handler) ResetPlayerClients() {
 	h.hub.ResetPlayerClients()
 }
 
+func (h *Handler) ResetRoomPlayers(roomCode string) {
+	h.hub.ResetRoomPlayers(roomCode)
+}
+
 func (h *Handler) BroadcastGameState(room *core.Room) {
 	h.hub.Broadcast(buildGameState(room))
 }

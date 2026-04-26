@@ -96,6 +96,24 @@ func (h *Hub) ResetPlayerClients() {
 	}
 }
 
+// ResetRoomPlayers clears PlayerID/RoomCode on non-admin clients in a specific room
+// and sends them a ROOM_RESET.
+func (h *Hub) ResetRoomPlayers(roomCode string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for _, c := range h.clients {
+		if c.IsAdmin || c.RoomCode != roomCode {
+			continue
+		}
+		c.PlayerID = ""
+		c.RoomCode = ""
+		select {
+		case c.send <- OutgoingMessage{Type: MsgRoomReset, Payload: map[string]any{}}:
+		default:
+		}
+	}
+}
+
 // SendToClient sends a message to a specific client by player ID.
 func (h *Hub) SendToClient(playerID string, msg OutgoingMessage) {
 	h.mu.RLock()

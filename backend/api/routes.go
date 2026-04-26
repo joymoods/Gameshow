@@ -99,13 +99,16 @@ func (ro *Router) handleRoomRoutes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// /api/rooms/:code (GET)
+	// /api/rooms/:code (GET, DELETE)
 	if len(parts) == 1 {
-		if r.Method == http.MethodGet {
+		switch r.Method {
+		case http.MethodGet:
 			writeJSON(w, http.StatusOK, room.Snapshot())
-			return
+		case http.MethodDelete:
+			ro.handleDeleteRoom(w, r, code)
+		default:
+			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		}
-		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
@@ -421,6 +424,13 @@ func (ro *Router) handleSwitchGame(w http.ResponseWriter, r *http.Request, room 
 	ro.wsHandler.BroadcastGameSwitched(string(body.GameType))
 	ro.wsHandler.BroadcastGameState(room)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// DELETE /api/rooms/:code
+func (ro *Router) handleDeleteRoom(w http.ResponseWriter, _ *http.Request, code string) {
+	ro.wsHandler.ResetRoomPlayers(code)
+	ro.manager.DeleteRoom(code)
+	writeJSON(w, http.StatusOK, map[string]string{"status": "closed"})
 }
 
 // POST /api/rooms/:code/question/end-buzzer

@@ -62,6 +62,17 @@ export default function HomePage({ toast }: Props) {
     }
   }
 
+  async function closeRoom(e: React.MouseEvent, code: string) {
+    e.stopPropagation();
+    if (!confirm(`Raum ${code} wirklich schließen?`)) return;
+    try {
+      await fetch(`${API}/api/rooms/${code}`, { method: 'DELETE' });
+      fetchRooms();
+    } catch {
+      toast('Raum konnte nicht geschlossen werden', 'error');
+    }
+  }
+
   return (
     <div className="home-page">
       <div className="home-header">
@@ -89,20 +100,29 @@ export default function HomePage({ toast }: Props) {
       ) : (
         <div className="rooms-grid">
           {rooms.map((room) => (
-            <button key={room.roomCode} className="room-card" onClick={() => openRoom(room)}>
-              <div className="room-card-code">{room.roomCode}</div>
-              <div className="room-card-meta">
-                <span className="room-card-game">
-                  {GAME_TYPE_LABELS[room.game_type as string] ?? room.game_type}
-                </span>
-                <span className={`room-card-phase phase-${String(room.room_phase).toLowerCase()}`}>
-                  {PHASE_LABELS[room.room_phase as string] ?? room.room_phase}
-                </span>
-              </div>
-              <div className="room-card-players">
-                {(room.scores?.length ?? 0)} Spieler
-              </div>
-            </button>
+            <div key={room.roomCode} className="room-card-wrapper">
+              <button className="room-card" onClick={() => openRoom(room)}>
+                <div className="room-card-code">{room.roomCode}</div>
+                <div className="room-card-meta">
+                  <span className="room-card-game">
+                    {GAME_TYPE_LABELS[room.game_type as string] ?? room.game_type}
+                  </span>
+                  <span className={`room-card-phase phase-${String(room.room_phase).toLowerCase()}`}>
+                    {PHASE_LABELS[room.room_phase as string] ?? room.room_phase}
+                  </span>
+                </div>
+                <div className="room-card-players">
+                  {(room.scores?.length ?? 0)} Spieler
+                </div>
+              </button>
+              <button
+                className="room-card-close"
+                onClick={(e) => closeRoom(e, room.roomCode)}
+                title="Raum schließen"
+              >
+                ✕
+              </button>
+            </div>
           ))}
         </div>
       )}
