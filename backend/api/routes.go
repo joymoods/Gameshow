@@ -5,18 +5,17 @@ import (
 	"net/http"
 	"strings"
 
-	"games/game"
 	"games/game/core"
 	"games/game/jeopardy"
 	"games/ws"
 )
 
 type Router struct {
-	manager   *game.Manager
+	manager   *core.Manager
 	wsHandler *ws.Handler
 }
 
-func NewRouter(manager *game.Manager, wsHandler *ws.Handler) *Router {
+func NewRouter(manager *core.Manager, wsHandler *ws.Handler) *Router {
 	return &Router{manager: manager, wsHandler: wsHandler}
 }
 
@@ -54,7 +53,7 @@ func (ro *Router) handleRooms(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		rooms := ro.manager.ListRooms()
-		snapshots := make([]game.RoomSnapshot, 0, len(rooms))
+		snapshots := make([]core.RoomSnapshot, 0, len(rooms))
 		for _, room := range rooms {
 			snapshots = append(snapshots, room.Snapshot())
 		}
@@ -187,7 +186,7 @@ func (ro *Router) handleRoomRoutes(w http.ResponseWriter, r *http.Request) {
 
 // POST /api/rooms/:code/quiz
 // Delegates to HandleAdminCommand("load_quiz") so the game owns the board state.
-func (ro *Router) handleUploadQuiz(w http.ResponseWriter, r *http.Request, room *game.Room) {
+func (ro *Router) handleUploadQuiz(w http.ResponseWriter, r *http.Request, room *core.Room) {
 	if room.Game == nil {
 		writeError(w, http.StatusBadRequest, "no game initialised")
 		return
@@ -206,13 +205,13 @@ func (ro *Router) handleUploadQuiz(w http.ResponseWriter, r *http.Request, room 
 }
 
 // GET /api/rooms/:code/export
-func (ro *Router) handleExportQuiz(w http.ResponseWriter, _ *http.Request, room *game.Room) {
+func (ro *Router) handleExportQuiz(w http.ResponseWriter, _ *http.Request, room *core.Room) {
 	snap := room.Snapshot()
 	writeJSON(w, http.StatusOK, snap.Categories)
 }
 
 // POST /api/rooms/:code/start
-func (ro *Router) handleStartGame(w http.ResponseWriter, r *http.Request, room *game.Room) {
+func (ro *Router) handleStartGame(w http.ResponseWriter, r *http.Request, room *core.Room) {
 	if room.ConnectedPlayerCount() == 0 {
 		writeError(w, http.StatusBadRequest, "no players connected")
 		return
@@ -235,7 +234,7 @@ func (ro *Router) handleStartGame(w http.ResponseWriter, r *http.Request, room *
 }
 
 // POST /api/rooms/:code/end
-func (ro *Router) handleEndGame(w http.ResponseWriter, _ *http.Request, room *game.Room) {
+func (ro *Router) handleEndGame(w http.ResponseWriter, _ *http.Request, room *core.Room) {
 	room.SetPhase(core.RoomPhaseGameOver)
 	snap := room.Snapshot()
 	ro.wsHandler.BroadcastGameOver(snap.Scores)
@@ -243,7 +242,7 @@ func (ro *Router) handleEndGame(w http.ResponseWriter, _ *http.Request, room *ga
 }
 
 // POST /api/rooms/:code/question/:id/open
-func (ro *Router) handleOpenQuestion(w http.ResponseWriter, _ *http.Request, room *game.Room, questionID string) {
+func (ro *Router) handleOpenQuestion(w http.ResponseWriter, _ *http.Request, room *core.Room, questionID string) {
 	if room.Game == nil {
 		writeError(w, http.StatusBadRequest, "no game initialised")
 		return
@@ -269,7 +268,7 @@ func (ro *Router) handleOpenQuestion(w http.ResponseWriter, _ *http.Request, roo
 
 // POST /api/rooms/:code/answer
 // Body: { "playerId": "...", "correct": true/false }
-func (ro *Router) handleAnswer(w http.ResponseWriter, r *http.Request, room *game.Room) {
+func (ro *Router) handleAnswer(w http.ResponseWriter, r *http.Request, room *core.Room) {
 	if room.Game == nil {
 		writeError(w, http.StatusBadRequest, "no game initialised")
 		return
@@ -309,7 +308,7 @@ func (ro *Router) handleAnswer(w http.ResponseWriter, r *http.Request, room *gam
 }
 
 // Player sub-routes
-func (ro *Router) handlePlayerRoutes(w http.ResponseWriter, r *http.Request, room *game.Room, rest string) {
+func (ro *Router) handlePlayerRoutes(w http.ResponseWriter, r *http.Request, room *core.Room, rest string) {
 	if rest == "order" && r.Method == http.MethodPost {
 		var ids []string
 		if err := json.NewDecoder(r.Body).Decode(&ids); err != nil {
@@ -352,7 +351,7 @@ func (ro *Router) handlePlayerRoutes(w http.ResponseWriter, r *http.Request, roo
 }
 
 // POST /api/rooms/:code/question/close
-func (ro *Router) handleCloseQuestion(w http.ResponseWriter, _ *http.Request, room *game.Room) {
+func (ro *Router) handleCloseQuestion(w http.ResponseWriter, _ *http.Request, room *core.Room) {
 	if room.Game == nil {
 		writeError(w, http.StatusBadRequest, "no game initialised")
 		return
@@ -384,7 +383,7 @@ func (ro *Router) handleCloseQuestion(w http.ResponseWriter, _ *http.Request, ro
 }
 
 // POST /api/rooms/:code/question/reveal
-func (ro *Router) handleRevealAnswer(w http.ResponseWriter, _ *http.Request, room *game.Room) {
+func (ro *Router) handleRevealAnswer(w http.ResponseWriter, _ *http.Request, room *core.Room) {
 	if room.Game == nil {
 		writeError(w, http.StatusBadRequest, "no game initialised")
 		return
@@ -401,7 +400,7 @@ func (ro *Router) handleRevealAnswer(w http.ResponseWriter, _ *http.Request, roo
 
 // POST /api/rooms/:code/game
 // Switches the game type; only allowed when room is in LOBBY phase.
-func (ro *Router) handleSwitchGame(w http.ResponseWriter, r *http.Request, room *game.Room) {
+func (ro *Router) handleSwitchGame(w http.ResponseWriter, r *http.Request, room *core.Room) {
 	if room.GetPhase() != core.RoomPhaseLobby {
 		writeError(w, http.StatusConflict, "game can only be switched in LOBBY phase")
 		return
@@ -425,7 +424,7 @@ func (ro *Router) handleSwitchGame(w http.ResponseWriter, r *http.Request, room 
 }
 
 // POST /api/rooms/:code/question/end-buzzer
-func (ro *Router) handleEndBuzzerPhase(w http.ResponseWriter, _ *http.Request, room *game.Room) {
+func (ro *Router) handleEndBuzzerPhase(w http.ResponseWriter, _ *http.Request, room *core.Room) {
 	if room.Game == nil {
 		writeError(w, http.StatusBadRequest, "no game initialised")
 		return

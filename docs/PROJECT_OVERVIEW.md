@@ -1,20 +1,48 @@
-# Jeopardy Quiz App — Projektübersicht
+# BrainStorm – Multi-Game Platform: Projektübersicht
 
 ## Konzept
 
-Eine Echtzeit-Jeopardy-Web-App mit zwei separaten Frontends: eines für den Moderator/Admin und eines für die Teilnehmer. Die Kommunikation läuft über WebSockets, sodass alle Clients den Spielstand in Echtzeit synchronisiert bekommen.
+Eine Echtzeit-Spielshow-Plattform mit zwei separaten Frontends (Admin / Player) und einem generischen Go-Backend, das mehrere Spieltypen und parallele Rooms unterstützt. Kommunikation läuft über WebSockets; alle Clients bekommen den Spielstand in Echtzeit synchronisiert.
+
+Aktuell implementierter Spieltyp: **Jeopardy** (weitere Typen können hinzugefügt werden ohne das generische Gerüst zu ändern).
 
 ---
 
 ## Architektur
 
 ```
-jeopardy/
-├── backend/              → Go-Server (WebSocket + REST API)
-├── admin-frontend/       → React + TypeScript + Vite (Moderator)
-├── player-frontend/      → React + TypeScript + Vite (Teilnehmer)
-└── docs/                 → Dokumentation (diese Dateien)
+games/
+├── backend/
+│   ├── game/
+│   │   ├── core/         → Generische Typen: Manager, Room, Player, Game-Interface, RoomPhase
+│   │   └── jeopardy/     → Jeopardy-Implementierung des Game-Interface + WS-Payloads
+│   ├── ws/               → WebSocket-Handler, Hub, generische Message-Typen
+│   ├── api/              → REST-Endpunkte (rooms, quiz, players, answer, …)
+│   └── media/            → Datei-Upload-Handler
+├── admin-frontend/        → React + TypeScript + Vite (Moderator)
+└── player-frontend/       → React + TypeScript + Vite (Teilnehmer)
 ```
+
+### Game-Interface (Backend)
+
+```go
+type Game interface {
+    Type() GameType
+    Snapshot() map[string]any
+    HandleAdminCommand(cmd string, payload map[string]any) (any, error)
+    HandlePlayerMessage(playerID, msgType string, payload map[string]any) error
+    OnStart(room *Room) error
+}
+```
+
+Neue Spieltypen implementieren dieses Interface und registrieren sich über `POST /api/rooms` / `POST /api/rooms/:code/game`.
+
+### RoomPhase vs. GamePhase
+
+| Typ | Werte | Zweck |
+|---|---|---|
+| `RoomPhase` (generisch) | `LOBBY`, `IN_PROGRESS`, `GAME_OVER` | Navigation in Frontends |
+| `JeopardyPhase` (intern) | `QUESTION_OPEN`, `ACTIVE_PLAYER_ANSWERING`, … | Jeopardy-interne Zustandsmaschine |
 
 ---
 
@@ -22,51 +50,23 @@ jeopardy/
 
 | Bereich | Technologie |
 |---|---|
-| Backend | Go, nhooyr.io/websocket, net/http |
-| Admin-Frontend | React, TypeScript, Vite |
-| Player-Frontend | React, TypeScript, Vite |
-| Medien-Upload | Multipart HTTP, lokal gespeichert (oder S3-kompatibel) |
-| State | In-Memory (kein DB erforderlich für MVP) |
+| Backend | Go 1.24, nhooyr.io/websocket, net/http |
+| Admin-Frontend | React, TypeScript, Vite, Zustand, React Router v7 |
+| Player-Frontend | React, TypeScript, Vite, Zustand, React Router v7 |
+| State | In-Memory (kein DB für MVP) |
+| Medien | Multipart HTTP-Upload, lokal gespeichert |
 
 ---
 
-## Spielmechanik
+## Room-System
 
-### Board
-- Der Moderator erstellt beliebig viele Kategorien mit je beliebig vielen Fragen
-- Jede Frage hat einen Punktwert (z.B. 200, 400, 600, 800, 1000)
-- Das Board zeigt alle Kategorien und Punktwerte — bereits gespielte Felder werden ausgeblendet
-
-### Spielreihenfolge
-1. Moderator wählt eine Frage vom Board aus
-2. Die Frage wird allen Spielern angezeigt (Text, Bild, Audio oder Video)
-3. Der **aktive Spieler** (reihum) beantwortet zuerst — kein Buzzer nötig
-4. Moderator bewertet die Antwort als **richtig** oder **falsch**
-
-### Falsch-Antwort → Buzzer-Phase
-- Bei falscher Antwort des aktiven Spielers öffnet sich die Buzzer-Phase
-- Alle anderen Spieler können buzzern
-- Der erste Buzzer darf antworten
-- Moderator bewertet erneut
-- Weitere Buzzer-Runden möglich bis alle gepasst haben oder jemand richtig liegt
-
-### Punktesystem
-| Ergebnis | Punkte |
-|---|---|
-| Richtig | + voller Fragenwert |
-| Falsch | - halber Fragenwert |
-
-*Beispiel: Frage mit 500 Punkten → Richtig: +500, Falsch: -250*
-
----
-
-## Frageformate
-
-Fragen können folgende Medien enthalten (einzeln oder kombiniert):
-- **Text** (Pflichtfeld)
-- **Bild** (JPG, PNG, GIF, WebP)
-- **Audio** (MP3, WAV, OGG)
-- **Video** (MP4, WebM)
+- Mehrere Rooms parallel möglich; jeder hat einen eindeutigen **6-stelligen Code**
+- Admin erstellt Room per `POST /api/rooms` mit `game_type`
+- `GET /api/rooms` listet alle aktiven Rooms
+- Spieler treten per Room-Code bei
+- Spieltyp kann in der Lobby gewechselt werden (`POST /api/rooms/:code/game`)
+- Room-State lebt in-memory (kein Persist nötig für MVP)
+- Reconnect-Handling: Spieler können mit gleichem Namen neu verbinden
 
 ---
 
@@ -75,92 +75,115 @@ Fragen können folgende Medien enthalten (einzeln oder kombiniert):
 ```
 Client → Server:
   JOIN_GAME           { roomCode, playerName }
-  BUZZ                { playerId }
-  
-Server → Clients:
-  GAME_STATE          { board, scores, activePlayers, currentPhase }
-  QUESTION_OPENED     { questionId, category, points, content }
+  BUZZ                {}
+
+Server → All clients:
+  GAME_STATE          { roomCode, board, scores, activePlayers, currentPhase,
+                        game_type, room_phase, game_state }
+  QUESTION_OPENED     { questionId, category, points, text, imageUrl?, audioUrl?, videoUrl? }
   ACTIVE_PLAYER       { playerId, playerName }
   BUZZER_OPEN         {}
   PLAYER_BUZZED       { playerId, playerName }
   ANSWER_RESULT       { playerId, correct, pointsDelta, newScore }
-  BOARD_UPDATE        { questionId, played: true }
+  ANSWER_REVEALED     { answer }
+  BOARD_UPDATE        { questionId, played }
   GAME_OVER           { finalScores }
+  GAME_SWITCHED       { game_type }
 
 Server → Admin only:
   PLAYER_JOINED       { playerId, playerName }
   PLAYER_LEFT         { playerId }
+
+Server → Player clients only:
+  ROOM_RESET          {}
 ```
 
 ---
 
-## Admin-Frontend — Funktionsumfang
+## REST API
 
-### Quiz-Builder
-- Kategorien erstellen, umbenennen, löschen
-- Fragen pro Kategorie erstellen mit Punktwert, Fragetext und optionalen Medien
-- Medien hochladen (Bild, Audio, Video)
-- Quiz speichern / laden (JSON-Export/Import)
+| Methode | Pfad | Beschreibung |
+|---|---|---|
+| `GET` | `/api/rooms` | Alle aktiven Rooms auflisten |
+| `POST` | `/api/rooms` | Room erstellen (`game_type` pflicht) |
+| `GET` | `/api/rooms/:code` | Room-Snapshot (für Reconnect) |
+| `POST` | `/api/rooms/:code/quiz` | Quiz hochladen (Jeopardy) |
+| `GET` | `/api/rooms/:code/export` | Quiz als JSON exportieren |
+| `POST` | `/api/rooms/:code/start` | Spiel starten |
+| `POST` | `/api/rooms/:code/end` | Spiel beenden |
+| `POST` | `/api/rooms/:code/game` | Spieltyp wechseln (nur Lobby) |
+| `POST` | `/api/rooms/:code/question/:id/open` | Frage öffnen |
+| `POST` | `/api/rooms/:code/question/close` | Frage schließen |
+| `POST` | `/api/rooms/:code/question/reveal` | Antwort aufdecken |
+| `POST` | `/api/rooms/:code/question/end-buzzer` | Buzzer-Phase beenden |
+| `POST` | `/api/rooms/:code/answer` | Antwort bewerten |
+| `POST` | `/api/rooms/:code/players/shuffle` | Reihenfolge zufällig |
+| `POST` | `/api/rooms/:code/players/order` | Reihenfolge setzen |
+| `POST` | `/api/rooms/:code/players/:id/score` | Score manuell setzen |
+| `POST` | `/api/media/upload` | Medien hochladen |
 
-### Lobby
-- Room-Code anzeigen (Spieler treten damit bei)
-- Liste der verbundenen Spieler sehen
-- Spielerreihenfolge festlegen oder zufällig würfeln
+---
+
+## Admin-Frontend
+
+### Startseite (`/`)
+- Liste aller aktiven Rooms
+- Room erstellen: Name + Spieltyp wählen
+- Zu bestehendem Room navigieren
+
+### Quiz-Builder (`/builder/jeopardy`)
+- Kategorien + Fragen erstellen (Text, Bild, Audio, Video)
+- Quiz exportieren / importieren (JSON)
+- Upload in den aktiven Room
+
+### Lobby (`/rooms/:code/lobby`)
+- Room-Code anzeigen + kopieren
+- Spieltyp anzeigen + wechseln (nur in Lobby möglich)
+- Spieler live sehen, Reihenfolge per Drag & Drop
 - Spiel starten
 
-### Control Panel (während des Spiels)
-- Board-Ansicht: Frage auswählen und öffnen
-- Aktiven Spieler sehen
-- Buzzer-Phase manuell öffnen/schließen
-- Antwort als richtig/falsch markieren
-- Scores manuell korrigieren (Notfall)
-- Nächsten Spieler setzen
-- Spiel beenden / Endscreen anzeigen
+### Control Panel (`/rooms/:code/control`)
+- Board-Ansicht: Frage auswählen
+- Aktiven Spieler + Buzzer-Phase sehen
+- Antwort als richtig/falsch bewerten
+- Scores live + manuell korrigieren
+- Spiel beenden
 
 ---
 
-## Player-Frontend — Funktionsumfang
+## Player-Frontend
 
-### Join-Screen
-- Room-Code eingeben
-- Namen eingeben
-- Beitreten
+### Join (`/`)
+- Room-Code + Name eingeben → WebSocket-Verbindung
 
-### Spielansicht
-- Board anschauen (read-only)
-- Aktuelle Frage angezeigt bekommen (Text, Bild, Audio, Video)
-- Anzeige wer gerade dran ist
-- **Buzzer-Button** (prominent, reaktionsschnell) — nur aktiv wenn Buzzer-Phase offen
-- Eigener Score immer sichtbar
-- Leaderboard nach jeder Frage
+### Warteraum (`/waiting`)
+- Warte auf Spielstart; navigiert automatisch zu `/game` wenn `room_phase → IN_PROGRESS`
 
-### Endscreen
-- Finale Rangliste mit allen Scores
+### Spielansicht (`/game`)
+- Erkennt `game_type` automatisch aus `GAME_STATE` → lädt passende UI
+- **Jeopardy-UI**: Board, Fragen-Overlay, Buzzer, Score-Strip, Mini-Leaderboard
+- Navigiert zu `/end` wenn `room_phase → GAME_OVER`
+
+### Endscreen (`/end`)
+- Finale Rangliste mit Platzierung
 
 ---
 
-## Room-System
+## Jeopardy — Spielmechanik
 
-- Jedes Spiel hat einen eindeutigen **Room-Code** (z.B. 6-stellig alphanumerisch)
-- Admin erstellt den Room, Spieler treten per Code bei
-- Room-State lebt im Backend in-memory (kein Persist nötig für MVP)
-- Reconnect-Handling: Spieler können mit gleichem Namen neu verbinden
+### Ablauf
+1. Moderator öffnet eine Frage vom Board
+2. Der **aktive Spieler** (reihum) antwortet — kein Buzzer nötig
+3. Moderator bewertet: **richtig** → Punkte + nächste Frage; **falsch** → Buzzer-Phase
 
----
+### Buzzer-Phase
+- Alle anderen Spieler können buzzern
+- Erster Buzzer darf antworten; Moderator bewertet erneut
 
-## MVP-Scope (Phase 1)
-
-Folgendes ist im ersten Build enthalten:
-- Backend mit WebSocket + REST
-- Admin: Quiz-Builder, Lobby, Control Panel
-- Player: Join, Board-View, Buzzer, Score
-- Alle Frageformate (Text, Bild, Audio, Video)
-- Punktesystem mit Abzügen
-- Buzzer-Phase nach Falschantwort
-- Endscreen
-
-Folgendes ist **nicht** im MVP:
-- Persistenz (Datenbank)
-- User-Authentifizierung für Admin (vorerst kein Login)
-- Multiple aktive Rooms gleichzeitig (vorerst ein Room pro Server)
-- Statistiken / Spielhistorie
+### Punktesystem
+| Ergebnis | Punkte |
+|---|---|
+| Aktiver Spieler richtig | + voller Fragenwert |
+| Aktiver Spieler falsch | − halber Fragenwert |
+| Buzzer richtig | + halber Fragenwert |
+| Buzzer falsch | − halber Fragenwert |

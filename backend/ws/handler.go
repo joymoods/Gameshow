@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
-	"games/game"
 	"games/game/core"
+	"games/game/jeopardy"
 
 	"github.com/google/uuid"
 	"nhooyr.io/websocket"
@@ -16,10 +16,10 @@ import (
 
 type Handler struct {
 	hub     *Hub
-	manager *game.Manager
+	manager *core.Manager
 }
 
-func NewHandler(hub *Hub, manager *game.Manager) *Handler {
+func NewHandler(hub *Hub, manager *core.Manager) *Handler {
 	return &Handler{hub: hub, manager: manager}
 }
 
@@ -152,7 +152,7 @@ func (h *Handler) handleBuzz(c *Client) {
 
 // buildGameState assembles a GAME_STATE message from the current room.
 // Room.Snapshot() already merges game-specific state (board, currentPhase) from Game.Snapshot().
-func buildGameState(room *game.Room) OutgoingMessage {
+func buildGameState(room *core.Room) OutgoingMessage {
 	snap := room.Snapshot()
 	return OutgoingMessage{
 		Type:    MsgGameState,
@@ -166,14 +166,14 @@ func (h *Handler) ResetPlayerClients() {
 	h.hub.ResetPlayerClients()
 }
 
-func (h *Handler) BroadcastGameState(room *game.Room) {
+func (h *Handler) BroadcastGameState(room *core.Room) {
 	h.hub.Broadcast(buildGameState(room))
 }
 
 func (h *Handler) BroadcastQuestionOpened(q *core.Question, categoryName string) {
 	h.hub.Broadcast(OutgoingMessage{
 		Type: MsgQuestionOpened,
-		Payload: QuestionOpenedPayload{
+		Payload: jeopardy.QuestionOpenedPayload{
 			QuestionID: q.ID,
 			Category:   categoryName,
 			Points:     q.Points,
@@ -199,7 +199,7 @@ func (h *Handler) BroadcastBuzzerOpen() {
 func (h *Handler) BroadcastAnswerResult(playerID string, correct bool, delta, newScore int) {
 	h.hub.Broadcast(OutgoingMessage{
 		Type: MsgAnswerResult,
-		Payload: AnswerResultPayload{
+		Payload: jeopardy.AnswerResultPayload{
 			PlayerID:    playerID,
 			Correct:     correct,
 			PointsDelta: delta,
@@ -211,14 +211,14 @@ func (h *Handler) BroadcastAnswerResult(playerID string, correct bool, delta, ne
 func (h *Handler) BroadcastAnswerRevealed(answer string) {
 	h.hub.Broadcast(OutgoingMessage{
 		Type:    MsgAnswerRevealed,
-		Payload: AnswerRevealedPayload{Answer: answer},
+		Payload: jeopardy.AnswerRevealedPayload{Answer: answer},
 	})
 }
 
 func (h *Handler) BroadcastBoardUpdate(questionID string) {
 	h.hub.Broadcast(OutgoingMessage{
 		Type:    MsgBoardUpdate,
-		Payload: BoardUpdatePayload{QuestionID: questionID, Played: true},
+		Payload: jeopardy.BoardUpdatePayload{QuestionID: questionID, Played: true},
 	})
 }
 

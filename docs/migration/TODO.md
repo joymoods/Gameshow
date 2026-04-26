@@ -95,11 +95,11 @@ Ziel: Player erkennt Spiel-Typ automatisch; richtige UI lädt ohne manuellen Ein
 
 Ziel: Keine Jeopardy-Reste im generischen Code; Dokumentation aktuell.
 
-- [ ] Backend: verbleibende alte `game/room.go`, `game/game.go` (nicht core/) Dateien löschen falls nicht bereits geschehen
-- [ ] Backend: `ws/messages.go` – Payload-Typen die Jeopardy-spezifisch sind (z.B. `QuestionOpenedPayload`) nach `game/jeopardy/` oder `api/jeopardy/` verschieben
-- [ ] Backend: `go build ./...` ohne Warnings/Errors bestätigen
-- [ ] Admin-Frontend: ungenutzte Imports + alte Route-Referenzen bereinigen; `npm run build` fehlerfrei
-- [ ] Player-Frontend: ungenutzte Imports bereinigen; `npm run build` fehlerfrei
-- [ ] `docs/PROJECT_OVERVIEW.md` auf Multi-Game-Architektur aktualisieren
-- [ ] `docs/TODO.md` (Projekt-Backlog, nicht diese Datei): erledigte Migration-Items markieren, neue Post-Migration-Items ergänzen
+- [x] Backend: verbleibende alte `game/room.go`, `game/game.go` (nicht core/) Dateien löschen falls nicht bereits geschehen
+- [x] Backend: `ws/messages.go` – Payload-Typen die Jeopardy-spezifisch sind (z.B. `QuestionOpenedPayload`) nach `game/jeopardy/` oder `api/jeopardy/` verschieben
+- [x] Backend: `go build ./...` ohne Warnings/Errors bestätigen
+- [x] Admin-Frontend: ungenutzte Imports + alte Route-Referenzen bereinigen; `npm run build` fehlerfrei
+- [x] Player-Frontend: ungenutzte Imports bereinigen; `npm run build` fehlerfrei
+- [x] `docs/PROJECT_OVERVIEW.md` auf Multi-Game-Architektur aktualisieren
+- [x] `docs/TODO.md` (Projekt-Backlog, nicht diese Datei): erledigte Migration-Items markieren, neue Post-Migration-Items ergänzen
 - [ ] Abschluss-Test: vollständige Jeopardy-Runde (Join → Lobby → Spiel → End) in allen Frontends

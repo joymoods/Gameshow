@@ -3,8 +3,8 @@ package ws
 // ---- Incoming message types (Client → Server) ----
 
 type IncomingMessage struct {
-	Type    string          `json:"type"`
-	Payload map[string]any  `json:"payload"`
+	Type    string         `json:"type"`
+	Payload map[string]any `json:"payload"`
 }
 
 // ---- Outgoing message types (Server → Client) ----
@@ -14,23 +14,13 @@ type OutgoingMessage struct {
 	Payload any    `json:"payload"`
 }
 
-// Payload structs for outgoing messages
+// Generic payload structs (game-type-agnostic)
 
 type GameStatePayload struct {
 	Board         any    `json:"board"`
 	Scores        any    `json:"scores"`
 	ActivePlayers any    `json:"activePlayers"`
 	CurrentPhase  string `json:"currentPhase"`
-}
-
-type QuestionOpenedPayload struct {
-	QuestionID string `json:"questionId"`
-	Category   string `json:"category"`
-	Points     int    `json:"points"`
-	Text       string `json:"text"`
-	ImageURL   string `json:"imageUrl,omitempty"`
-	AudioURL   string `json:"audioUrl,omitempty"`
-	VideoURL   string `json:"videoUrl,omitempty"`
 }
 
 type ActivePlayerPayload struct {
@@ -41,18 +31,6 @@ type ActivePlayerPayload struct {
 type PlayerBuzzedPayload struct {
 	PlayerID   string `json:"playerId"`
 	PlayerName string `json:"playerName"`
-}
-
-type AnswerResultPayload struct {
-	PlayerID   string `json:"playerId"`
-	Correct    bool   `json:"correct"`
-	PointsDelta int   `json:"pointsDelta"`
-	NewScore   int    `json:"newScore"`
-}
-
-type BoardUpdatePayload struct {
-	QuestionID string `json:"questionId"`
-	Played     bool   `json:"played"`
 }
 
 type GameOverPayload struct {
@@ -66,10 +44,6 @@ type PlayerJoinedPayload struct {
 
 type PlayerLeftPayload struct {
 	PlayerID string `json:"playerId"`
-}
-
-type AnswerRevealedPayload struct {
-	Answer string `json:"answer"`
 }
 
 type ErrorPayload struct {
