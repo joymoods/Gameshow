@@ -3,8 +3,10 @@ import {
   MSG,
   type Category,
   type GamePhase,
+  type GameType,
   type Player,
   type QuestionOpenedPayload,
+  type RoomPhase,
   type WsMessage,
 } from '../types';
 
@@ -21,6 +23,8 @@ interface GameState {
   // Room
   roomCode: string;
   phase: GamePhase;
+  gameType: GameType | null;
+  roomPhase: RoomPhase | null;
 
   // Board
   board: Category[];
@@ -65,6 +69,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   myPlayerName: '',
   roomCode: '',
   phase: 'LOBBY',
+  gameType: null,
+  roomPhase: null,
   board: [],
   players: [],
   playerOrder: [],
@@ -95,6 +101,8 @@ export const useGameStore = create<GameState>((set, get) => ({
           scores: Player[];
           activePlayers: string[];
           currentPhase: GamePhase;
+          game_type?: GameType | string;
+          room_phase?: RoomPhase | string;
         };
         set((state) => {
           // Resolve own player ID by matching name — only needed once after join
@@ -111,6 +119,8 @@ export const useGameStore = create<GameState>((set, get) => ({
             players: p.scores,
             playerOrder: p.activePlayers,
             phase: p.currentPhase,
+            gameType: (p.game_type as GameType) ?? null,
+            roomPhase: (p.room_phase as RoomPhase) ?? null,
             myPlayerId,
           };
         });
@@ -213,11 +223,18 @@ export const useGameStore = create<GameState>((set, get) => ({
         break;
       }
 
+      case MSG.GAME_SWITCHED: {
+        const p = msg.payload as { game_type: GameType };
+        set({ gameType: p.game_type });
+        break;
+      }
+
       case MSG.ROOM_RESET: {
         // Admin started a new session — clear state and send player back to join
         set({
           roomReset: true,
-          roomCode: '', phase: 'LOBBY', board: [], players: [],
+          roomCode: '', phase: 'LOBBY', gameType: null, roomPhase: null,
+          board: [], players: [],
           playerOrder: [], activePlayerId: null, activePlayerName: null,
           currentQuestion: null, buzzerOpen: false, hasBuzzed: false,
           buzzedPlayerId: null, buzzedPlayerName: null, finalScores: [],

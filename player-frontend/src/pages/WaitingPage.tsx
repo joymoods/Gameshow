@@ -4,15 +4,13 @@ import { useGameStore } from '../store/gameStore';
 
 export default function WaitingPage() {
   const navigate = useNavigate();
-  const { myPlayerName, roomCode, players, phase } = useGameStore();
+  const { myPlayerName, roomCode, players, roomPhase } = useGameStore();
 
   useEffect(() => {
-    if (phase === 'QUESTION_OPEN' || phase === 'ACTIVE_PLAYER_ANSWERING' || phase === 'BUZZER_PHASE') {
-      navigate('/game');
-    } else if (phase === 'GAME_OVER') {
-      navigate('/end');
-    }
-  }, [phase, navigate]);
+    if (!roomPhase) return;
+    if (roomPhase === 'IN_PROGRESS') navigate('/game');
+    else if (roomPhase === 'GAME_OVER') navigate('/end');
+  }, [roomPhase, navigate]);
 
   if (!roomCode) {
     return (

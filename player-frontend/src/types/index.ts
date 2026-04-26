@@ -24,6 +24,10 @@ export interface Player {
   connected: boolean;
 }
 
+export type GameType = 'jeopardy';
+
+export type RoomPhase = 'LOBBY' | 'IN_PROGRESS' | 'GAME_OVER';
+
 export type GamePhase =
   | 'LOBBY'
   | 'QUESTION_OPEN'
@@ -52,6 +56,9 @@ export interface GameStatePayload {
   scores: Player[];
   activePlayers: string[];
   currentPhase: GamePhase;
+  game_type?: GameType | string;
+  room_phase?: RoomPhase | string;
+  game_state?: Record<string, unknown>;
 }
 
 export interface QuestionOpenedPayload {
@@ -118,4 +125,5 @@ export const MSG = {
   PLAYER_LEFT: 'PLAYER_LEFT',
   ERROR: 'ERROR',
   ROOM_RESET: 'ROOM_RESET',
+  GAME_SWITCHED: 'GAME_SWITCHED',
 } as const;
