@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import { useGameStore } from '../../../store/gameStore';
@@ -6,7 +6,7 @@ import { useLobbyStore } from '../../../store/lobbyStore';
 import type { Category, Question } from '../../../types';
 import type { ToastType } from '../../../App';
 
-const API = `http://${window.location.hostname}:8080`;
+const API = import.meta.env.VITE_API_URL ?? `http://${window.location.hostname}:8080`;
 
 function emptyQuestion(categoryId: string): Question {
   return { id: uuidv4(), categoryId, points: 200, text: '', answer: '', played: false };
@@ -166,11 +166,17 @@ interface Props {
   toast: (msg: string, type?: ToastType) => void;
 }
 
+interface QuestionDrag {
+  catId: string;
+  fromIdx: number;
+}
+
 export default function BuilderPage({ toast }: Props) {
   const navigate = useNavigate();
   const { builderCategories, setBuilderCategories } = useGameStore();
   const { activeRoomCode } = useLobbyStore();
   const importRef = useRef<HTMLInputElement>(null);
+  const [questionDrag, setQuestionDrag] = useState<QuestionDrag | null>(null);
 
   function addCategory() {
     setBuilderCategories([...builderCategories, emptyCategory()]);
@@ -207,6 +213,29 @@ export default function BuilderPage({ toast }: Props) {
         c.id === catId ? { ...c, questions: c.questions.filter((q) => q.id !== qId) } : c
       )
     );
+  }
+
+  function onQuestionDragStart(catId: string, fromIdx: number) {
+    setQuestionDrag({ catId, fromIdx });
+  }
+
+  function onQuestionDragOver(e: React.DragEvent, catId: string, toIdx: number) {
+    e.preventDefault();
+    if (!questionDrag || questionDrag.catId !== catId || questionDrag.fromIdx === toIdx) return;
+    setBuilderCategories(
+      builderCategories.map((c) => {
+        if (c.id !== catId) return c;
+        const qs = [...c.questions];
+        const [moved] = qs.splice(questionDrag.fromIdx, 1);
+        qs.splice(toIdx, 0, moved);
+        return { ...c, questions: qs };
+      })
+    );
+    setQuestionDrag({ catId, fromIdx: toIdx });
+  }
+
+  function onQuestionDragEnd() {
+    setQuestionDrag(null);
   }
 
   function exportQuiz() {
@@ -338,13 +367,22 @@ export default function BuilderPage({ toast }: Props) {
                 </div>
 
                 <div className="questions-list">
-                  {cat.questions.map((q) => (
-                    <QuestionEditor
+                  {cat.questions.map((q, qi) => (
+                    <div
                       key={q.id}
-                      question={q}
-                      onChange={(updated) => updateQuestion(cat.id, updated)}
-                      onDelete={() => deleteQuestion(cat.id, q.id)}
-                    />
+                      draggable
+                      onDragStart={() => onQuestionDragStart(cat.id, qi)}
+                      onDragOver={(e) => onQuestionDragOver(e, cat.id, qi)}
+                      onDragEnd={onQuestionDragEnd}
+                      className={questionDrag?.catId === cat.id && questionDrag.fromIdx === qi ? 'dragging' : ''}
+                      style={{ cursor: 'grab' }}
+                    >
+                      <QuestionEditor
+                        question={q}
+                        onChange={(updated) => updateQuestion(cat.id, updated)}
+                        onDelete={() => deleteQuestion(cat.id, q.id)}
+                      />
+                    </div>
                   ))}
                 </div>
 

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGameStore } from '../../../store/gameStore';
 import { buzz } from '../../../ws/socket';
+import { playBuzz, playCorrect, playWrong } from '../../../audio';
 
-const BACKEND = `http://${window.location.hostname}:8080`;
+const BACKEND = import.meta.env.VITE_API_URL ?? `http://${window.location.hostname}:8080`;
 
 function mediaUrl(url?: string): string | undefined {
   if (!url) return undefined;
@@ -66,6 +67,19 @@ export default function JeopardyGame() {
     });
     prevScores.current = Object.fromEntries(players.map((p) => [p.id, p.score]));
   }, [players]);
+
+  // Sound: buzzer opens → play buzz for eligible players
+  useEffect(() => {
+    if (buzzerOpen && !hasBuzzed) playBuzz();
+  }, [buzzerOpen]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sound: answer result
+  useEffect(() => {
+    if (!lastAnswerResult) return;
+    if (lastAnswerResult.playerId === myPlayerId) {
+      lastAnswerResult.correct ? playCorrect() : playWrong();
+    }
+  }, [lastAnswerResult]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   const me = players.find((p) => p.id === myPlayerId);
   const myScore = me?.score ?? 0;

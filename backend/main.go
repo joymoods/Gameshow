@@ -1,12 +1,13 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
 
 	"games/api"
-	"games/game"
+	"games/game/core"
 	"games/media"
 	"games/ws"
 )
@@ -22,7 +23,8 @@ func main() {
 		uploadDir = "./uploads"
 	}
 
-	manager := game.NewManager()
+	manager := core.NewManager()
+	go manager.StartCleanup(context.Background())
 	hub := ws.NewHub()
 	wsHandler := ws.NewHandler(hub, manager)
 	apiRouter := api.NewRouter(manager, wsHandler)

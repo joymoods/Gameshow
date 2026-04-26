@@ -5,6 +5,7 @@ import BuilderPage from './pages/games/jeopardy/BuilderPage';
 import LobbyPage from './pages/LobbyPage';
 import ControlPage from './pages/ControlPage';
 import HomePage from './pages/HomePage';
+import PinPage from './pages/PinPage';
 import { useGameStore } from './store/gameStore';
 import { useLobbyStore } from './store/lobbyStore';
 import './App.css';
@@ -93,7 +94,7 @@ function ControlRoute({ toast }: { toast: (msg: string, type?: ToastType) => voi
 
   function handleEndGame() {
     if (!confirm('Spiel wirklich beenden?')) return;
-    fetch(`http://${window.location.hostname}:8080/api/rooms/${code}/end`, {
+    fetch(`${import.meta.env.VITE_API_URL ?? `http://${window.location.hostname}:8080`}/api/rooms/${code}/end`, {
       method: 'POST',
     }).catch(() => {});
     resetGameState();
@@ -160,10 +161,20 @@ function AppShell() {
   );
 }
 
+const REQUIRED_PIN = import.meta.env.VITE_ADMIN_PIN as string | undefined;
+
 export default function App() {
+  const [authed, setAuthed] = useState(
+    !REQUIRED_PIN || sessionStorage.getItem('admin_auth') === '1'
+  );
+
   useEffect(() => {
-    connect();
-  }, []);
+    if (authed) connect();
+  }, [authed]);
+
+  if (!authed) {
+    return <PinPage onAuth={() => setAuthed(true)} />;
+  }
 
   return (
     <BrowserRouter>

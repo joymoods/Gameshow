@@ -1,0 +1,30 @@
+:80 {
+    # Backend API
+    handle /api/* {
+        reverse_proxy backend:8080
+    }
+
+    # WebSocket
+    handle /ws {
+        reverse_proxy backend:8080
+    }
+
+    # Medien-Uploads
+    handle /media/* {
+        reverse_proxy backend:8080
+    }
+
+    # Player-Frontend (unter /player)
+    handle /player* {
+        root * /srv/player
+        try_files {path} /index.html
+        file_server
+    }
+
+    # Admin-Frontend (Root)
+    handle {
+        root * /srv/admin
+        try_files {path} /index.html
+        file_server
+    }
+}

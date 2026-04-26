@@ -699,3 +699,58 @@ input { font-family: inherit; outline: none; transition: border-color 0.2s, box-
   border: none;
 }
 .end-restart-btn:hover { filter: brightness(1.12); }
+
+/* ---- Landscape-Optimierung für Mobilgeräte ---- */
+@media (orientation: landscape) and (max-height: 600px) {
+  .game-nav {
+    height: 40px;
+    padding: 0 12px;
+    gap: 8px;
+  }
+  .game-nav-brand { font-size: 14px; }
+  .game-nav-identity { padding: 4px 10px; }
+  .game-nav-avatar { width: 22px; height: 22px; font-size: 10px; }
+  .game-nav-name { font-size: 12px; }
+  .game-nav-score-box { padding: 4px 10px; min-width: 70px; }
+  .game-nav-score-value { font-size: 14px; }
+  .game-nav-progress-bar { width: 60px; }
+  .game-nav-room-badge { display: none; }
+
+  .game-board-area {
+    flex-direction: row;
+  }
+  .game-board-scroll {
+    flex: 1;
+    min-width: 0;
+  }
+  .player-strip {
+    flex-direction: column;
+    width: 80px;
+    overflow-y: auto;
+    border-top: none;
+    border-left: 1px solid var(--border);
+    padding: 8px 4px;
+    gap: 6px;
+  }
+  .player-strip-card {
+    flex-direction: column;
+    padding: 6px 4px;
+    min-width: unset;
+    width: 72px;
+    text-align: center;
+  }
+  .player-strip-name { font-size: 10px; }
+  .player-strip-score { font-size: 13px; }
+
+  .game-board-header { padding: 4px 8px; }
+  .game-board-label { font-size: 10px; }
+  .game-board-cat-header { font-size: 10px; padding: 4px 2px; }
+  .game-board-cell { font-size: 13px; }
+
+  .question-overlay { padding: 6px; }
+  .overlay-main-card { padding: 12px; }
+  .overlay-question-text { font-size: 16px !important; }
+  .overlay-meta { gap: 8px; }
+  .mini-leaderboard { padding: 6px 8px; gap: 4px; }
+  .mini-lb-entry { font-size: 11px; }
+}

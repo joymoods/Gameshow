@@ -4,7 +4,7 @@ import { useGameStore } from '../store/gameStore';
 import type { Question } from '../types';
 import type { ToastType } from '../App';
 
-const API = `http://${window.location.hostname}:8080`;
+const API = import.meta.env.VITE_API_URL ?? `http://${window.location.hostname}:8080`;
 
 interface ScoreDelta {
   val: number;
@@ -80,7 +80,7 @@ export default function ControlPage({ toast }: Props) {
   const {
     roomCode: storeRoomCode, board, players, playerOrder,
     activePlayerId, activePlayerName,
-    currentQuestion, phase,
+    currentQuestion, phase, roomPhase,
     buzzedPlayerId, buzzedPlayerName,
     finalScores, resetGameState,
   } = useGameStore();
@@ -154,6 +154,15 @@ export default function ControlPage({ toast }: Props) {
       setAnswering(false);
     }
   }
+
+  // Warn before leaving while game is running
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (roomPhase === 'IN_PROGRESS') { e.preventDefault(); e.returnValue = ''; }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [roomPhase]);
 
   // Keyboard shortcuts
   const judgeRef = useRef(judgeAnswer);

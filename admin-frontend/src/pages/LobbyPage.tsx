@@ -1,34 +1,23 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { QRCodeSVG } from 'qrcode.react';
 import { useGameStore } from '../store/gameStore';
 import { useLobbyStore } from '../store/lobbyStore';
 import type { GameType } from '../types';
 import type { ToastType } from '../App';
 
-const API = `http://${window.location.hostname}:8080`;
+const API = import.meta.env.VITE_API_URL ?? `http://${window.location.hostname}:8080`;
 
 interface Props {
   toast: (msg: string, type?: ToastType) => void;
 }
 
-function QrPlaceholder() {
+function QrCode({ roomCode }: { roomCode: string }) {
+  const playerBase = import.meta.env.VITE_PLAYER_URL ?? `http://${window.location.hostname}:5174`;
+  const url = `${playerBase}/?room=${roomCode}`;
   return (
-    <div className="qr-placeholder">
-      <svg width="110" height="110" viewBox="0 0 110 110" xmlns="http://www.w3.org/2000/svg">
-        {Array.from({ length: 11 }).map((_, i) => (
-          <line key={i} x1={i * 10} y1="0" x2={i * 10} y2="110" stroke="#252c40" strokeWidth="0.5" />
-        ))}
-        {Array.from({ length: 11 }).map((_, i) => (
-          <line key={i + 'h'} x1="0" y1={i * 10} x2="110" y2={i * 10} stroke="#252c40" strokeWidth="0.5" />
-        ))}
-        {([[8, 8], [8, 78], [78, 8]] as [number, number][]).map(([x, y], i) => (
-          <g key={i}>
-            <rect x={x} y={y} width="24" height="24" fill="none" stroke="#4f6ef7" strokeWidth="2.5" rx="2" />
-            <rect x={x + 6} y={y + 6} width="12" height="12" fill="#4f6ef7" rx="1" />
-          </g>
-        ))}
-        <text x="55" y="62" textAnchor="middle" fontSize="9" fill="#6272a4" fontFamily="monospace">QR-CODE</text>
-      </svg>
+    <div className="qr-placeholder" title={url}>
+      <QRCodeSVG value={url} size={110} fgColor="#4f6ef7" bgColor="transparent" />
     </div>
   );
 }
@@ -176,7 +165,7 @@ export default function LobbyPage({ toast }: Props) {
               {copied ? '✓ Kopiert' : 'Code kopieren'}
             </button>
           </div>
-          <QrPlaceholder />
+          <QrCode roomCode={code} />
         </div>
 
         {/* Game type */}
