@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useGameStore } from '../store/gameStore';
 import type { Question } from '../types';
 import type { ToastType } from '../App';
@@ -76,13 +76,16 @@ function ScoreRow({
 
 export default function ControlPage({ toast }: Props) {
   const navigate = useNavigate();
+  const { code: urlCode } = useParams<{ code?: string }>();
   const {
-    roomCode, board, players, playerOrder,
+    roomCode: storeRoomCode, board, players, playerOrder,
     activePlayerId, activePlayerName,
     currentQuestion, phase,
     buzzedPlayerId, buzzedPlayerName,
     finalScores, resetGameState,
   } = useGameStore();
+  // Prefer URL param so the page works when navigated directly
+  const roomCode = urlCode ?? storeRoomCode;
 
   const [answering, setAnswering] = useState(false);
   const [showAnswer, setShowAnswer] = useState(false);
@@ -197,7 +200,7 @@ export default function ControlPage({ toast }: Props) {
           ))}
         </ol>
         <button className="btn-primary btn-lg" onClick={() => { resetGameState(); navigate('/'); }}>
-          Neues Spiel
+          Zurück zur Startseite
         </button>
       </div>
     );

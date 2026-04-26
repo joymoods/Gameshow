@@ -3,8 +3,10 @@ import {
   MSG,
   type Category,
   type GamePhase,
+  type GameType,
   type Player,
   type QuestionOpenedPayload,
+  type RoomPhase,
   type WsMessage,
 } from '../types';
 
@@ -25,6 +27,8 @@ interface GameState {
   // Room
   roomCode: string;
   phase: GamePhase;
+  gameType: GameType | null;
+  roomPhase: RoomPhase | null;
 
   // Quiz / Board
   board: Category[];
@@ -53,6 +57,8 @@ export const useGameStore = create<GameState>((set) => ({
   connected: false,
   roomCode: '',
   phase: 'LOBBY',
+  gameType: null,
+  roomPhase: null,
   board: [],
   builderCategories: [],
   players: [],
@@ -71,6 +77,8 @@ export const useGameStore = create<GameState>((set) => ({
   resetGameState: () => set({
     roomCode: '',
     phase: 'LOBBY',
+    gameType: null,
+    roomPhase: null,
     board: [],
     players: [],
     playerOrder: [],
@@ -91,14 +99,24 @@ export const useGameStore = create<GameState>((set) => ({
           scores: Player[];
           activePlayers: string[];
           currentPhase: GamePhase;
+          game_type?: GameType;
+          room_phase?: RoomPhase;
         };
         set({
           roomCode: p.roomCode,
-          board: p.board,
-          players: p.scores,
-          playerOrder: p.activePlayers,
+          board: p.board ?? [],
+          players: p.scores ?? [],
+          playerOrder: p.activePlayers ?? [],
           phase: p.currentPhase,
+          gameType: p.game_type ?? null,
+          roomPhase: p.room_phase ?? null,
         });
+        break;
+      }
+
+      case MSG.GAME_SWITCHED: {
+        const p = msg.payload as { game_type: GameType };
+        set({ gameType: p.game_type });
         break;
       }
 

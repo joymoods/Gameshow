@@ -1,3 +1,9 @@
+// ---- Enum types ----
+
+export type GameType = 'jeopardy';
+
+export type RoomPhase = 'LOBBY' | 'IN_PROGRESS' | 'GAME_OVER';
+
 // ---- Domain types ----
 
 export interface Question {
@@ -53,6 +59,24 @@ export interface GameStatePayload {
   scores: Player[];
   activePlayers: string[];
   currentPhase: GamePhase;
+  // Phase 3 additions (additive – backends before Phase 3 omit these)
+  game_type?: GameType;
+  room_phase?: RoomPhase;
+  game_state?: Record<string, unknown>;
+}
+
+export interface GameSwitchedPayload {
+  game_type: GameType;
+}
+
+// Snapshot shape returned by GET /api/rooms and GET /api/rooms/:code
+export interface RoomInfo {
+  roomCode: string;
+  game_type: GameType | string;
+  room_phase: RoomPhase | string;
+  scores: Player[];
+  activePlayers: string[];
+  currentPhase: string;
 }
 
 export interface QuestionOpenedPayload {
@@ -107,6 +131,7 @@ export interface ErrorPayload {
 // Message type constants
 export const MSG = {
   GAME_STATE: 'GAME_STATE',
+  GAME_SWITCHED: 'GAME_SWITCHED',
   QUESTION_OPENED: 'QUESTION_OPENED',
   ACTIVE_PLAYER: 'ACTIVE_PLAYER',
   BUZZER_OPEN: 'BUZZER_OPEN',

@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { BrowserRouter, Route, Routes, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Route, Routes, Navigate, useLocation, useParams } from 'react-router-dom';
 import { connect } from './ws/socket';
-import BuilderPage from './pages/BuilderPage';
+import BuilderPage from './pages/games/jeopardy/BuilderPage';
 import LobbyPage from './pages/LobbyPage';
 import ControlPage from './pages/ControlPage';
+import HomePage from './pages/HomePage';
 import { useGameStore } from './store/gameStore';
+import { useLobbyStore } from './store/lobbyStore';
 import './App.css';
 
 // ---- Toast system ----
@@ -41,27 +43,34 @@ function Toasts({ toasts }: { toasts: Toast[] }) {
 
 // ---- Nav ----
 
+const PAGE_TITLES: Record<string, string> = {
+  '/': 'Lobbys',
+  '/builder/jeopardy': 'Quiz-Builder',
+};
+
 function Nav({ onEndGame }: { onEndGame?: () => void }) {
   const location = useLocation();
-  const roomCode = useGameStore((s) => s.roomCode);
+  const params = useParams<{ code?: string }>();
+  const activeRoomCode = useLobbyStore((s) => s.activeRoomCode);
 
-  const subtitles: Record<string, string> = {
-    '/': 'Quiz-Builder',
-    '/lobby': 'Lobby',
-    '/control': 'Control Panel',
-  };
-  const subtitle = subtitles[location.pathname] ?? '';
-  const showRoom = location.pathname !== '/';
+  const roomCode = params.code ?? activeRoomCode ?? '';
+
+  const subtitle =
+    PAGE_TITLES[location.pathname] ??
+    (location.pathname.endsWith('/lobby') ? 'Lobby' :
+     location.pathname.endsWith('/control') ? 'Control Panel' : '');
+
+  const showRoom = !!roomCode && !['/', '/builder/jeopardy'].includes(location.pathname);
 
   return (
     <nav className="app-nav">
-      <div className="nav-brand">
+      <a className="nav-brand" href="/" style={{ textDecoration: 'none' }}>
         <span className="nav-brand-icon">⚡</span>
         BrainStorm
-      </div>
+      </a>
       {subtitle && <span className="nav-subtitle">{subtitle}</span>}
       <div className="nav-spacer" />
-      {showRoom && roomCode && (
+      {showRoom && (
         <div className="nav-room">
           <span className="nav-room-label">ROOM</span>
           <span className="nav-room-code">{roomCode}</span>
@@ -76,16 +85,15 @@ function Nav({ onEndGame }: { onEndGame?: () => void }) {
   );
 }
 
-// ---- App shell ----
+// ---- Route wrappers that need URL params ----
 
-function AppShell() {
-  const { toasts, add: toast } = useToasts();
+function ControlRoute({ toast }: { toast: (msg: string, type?: ToastType) => void }) {
+  const { code } = useParams<{ code: string }>();
   const { resetGameState } = useGameStore();
 
   function handleEndGame() {
     if (!confirm('Spiel wirklich beenden?')) return;
-    const roomCode = useGameStore.getState().roomCode;
-    fetch(`http://${window.location.hostname}:8080/api/rooms/${roomCode}/end`, {
+    fetch(`http://${window.location.hostname}:8080/api/rooms/${code}/end`, {
       method: 'POST',
     }).catch(() => {});
     resetGameState();
@@ -93,19 +101,42 @@ function AppShell() {
   }
 
   return (
+    <>
+      <Nav onEndGame={handleEndGame} />
+      <ControlPage toast={toast} />
+    </>
+  );
+}
+
+// ---- App shell ----
+
+function AppShell() {
+  const { toasts, add: toast } = useToasts();
+
+  return (
     <div className="app-shell">
       <Routes>
+        {/* New routes */}
         <Route
-          path="/control"
+          path="/"
           element={
             <>
-              <Nav onEndGame={handleEndGame} />
-              <ControlPage toast={toast} />
+              <Nav />
+              <HomePage toast={toast} />
             </>
           }
         />
         <Route
-          path="/lobby"
+          path="/builder/jeopardy"
+          element={
+            <>
+              <Nav />
+              <BuilderPage toast={toast} />
+            </>
+          }
+        />
+        <Route
+          path="/rooms/:code/lobby"
           element={
             <>
               <Nav />
@@ -114,14 +145,14 @@ function AppShell() {
           }
         />
         <Route
-          path="/"
-          element={
-            <>
-              <Nav />
-              <BuilderPage toast={toast} />
-            </>
-          }
+          path="/rooms/:code/control"
+          element={<ControlRoute toast={toast} />}
         />
+
+        {/* Legacy redirects – keep old bookmarks working */}
+        <Route path="/lobby" element={<Navigate to="/" replace />} />
+        <Route path="/control" element={<Navigate to="/" replace />} />
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <Toasts toasts={toasts} />
