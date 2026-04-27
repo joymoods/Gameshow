@@ -21,14 +21,15 @@ const (
 // RoomSnapshot is the serialisable state sent to clients.
 // Categories and CurrentPhase are populated from Game.Snapshot() in Room.Snapshot().
 type RoomSnapshot struct {
-	Code         string         `json:"roomCode"`
-	Categories   []Category     `json:"board"`
-	Scores       []Player       `json:"scores"`
-	PlayerOrder  []string       `json:"activePlayers"`
-	CurrentPhase string         `json:"currentPhase"`
-	GameType     string         `json:"game_type"`
-	RoomPhase    string         `json:"room_phase"`
-	GameState    map[string]any `json:"game_state,omitempty"`
+	Code           string         `json:"roomCode"`
+	Categories     []Category     `json:"board"`
+	Scores         []Player       `json:"scores"`
+	PlayerOrder    []string       `json:"activePlayers"`
+	CurrentPhase   string         `json:"currentPhase"`
+	GameType       string         `json:"game_type"`
+	RoomPhase      string         `json:"room_phase"`
+	ActivePlayerID string         `json:"active_player_id,omitempty"`
+	GameState      map[string]any `json:"game_state,omitempty"`
 }
 
 // Room is the generic container. It knows players and order but no game logic.
@@ -223,12 +224,18 @@ func (r *Room) Snapshot() RoomSnapshot {
 	order := make([]string, len(r.PlayerOrder))
 	copy(order, r.PlayerOrder)
 
+	activePlayerID := ""
+	if len(r.PlayerOrder) > 0 {
+		activePlayerID = r.PlayerOrder[r.ActivePlayerIndex%len(r.PlayerOrder)]
+	}
+
 	snap := RoomSnapshot{
-		Code:        r.Code,
-		Scores:      scores,
-		PlayerOrder: order,
-		GameType:    string(r.GameType),
-		RoomPhase:   string(r.Phase),
+		Code:           r.Code,
+		Scores:         scores,
+		PlayerOrder:    order,
+		GameType:       string(r.GameType),
+		RoomPhase:      string(r.Phase),
+		ActivePlayerID: activePlayerID,
 	}
 
 	// Merge game-specific state for backward-compatible GAME_STATE payloads.

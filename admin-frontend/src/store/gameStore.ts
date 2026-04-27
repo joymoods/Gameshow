@@ -101,15 +101,44 @@ export const useGameStore = create<GameState>((set) => ({
           currentPhase: GamePhase;
           game_type?: GameType;
           room_phase?: RoomPhase;
+          active_player_id?: string;
+          game_state?: {
+            current_question?: { id: string; points: number; text: string; answer?: string; imageUrl?: string; audioUrl?: string; videoUrl?: string };
+            buzzed_player_id?: string;
+          };
         };
+        const allPlayers = p.scores ?? [];
+        const board = p.board ?? [];
+
+        const activeId = p.active_player_id ?? null;
+        const activeName = allPlayers.find((pl) => pl.id === activeId)?.name ?? null;
+
+        const buzzedId = p.game_state?.buzzed_player_id || null;
+        const buzzedName = allPlayers.find((pl) => pl.id === buzzedId)?.name ?? null;
+
+        let currentQuestion = null;
+        const cq = p.game_state?.current_question;
+        if (cq?.id) {
+          let catName = '';
+          for (const cat of board) {
+            if (cat.questions.some((q) => q.id === cq.id)) { catName = cat.name; break; }
+          }
+          currentQuestion = { questionId: cq.id, category: catName, points: cq.points, text: cq.text, imageUrl: cq.imageUrl, audioUrl: cq.audioUrl, videoUrl: cq.videoUrl };
+        }
+
         set({
           roomCode: p.roomCode,
-          board: p.board ?? [],
-          players: p.scores ?? [],
+          board,
+          players: allPlayers,
           playerOrder: p.activePlayers ?? [],
           phase: p.currentPhase,
           gameType: p.game_type ?? null,
           roomPhase: p.room_phase ?? null,
+          activePlayerId: activeId,
+          activePlayerName: activeName,
+          buzzedPlayerId: buzzedId,
+          buzzedPlayerName: buzzedName,
+          currentQuestion,
         });
         break;
       }

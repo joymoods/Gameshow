@@ -171,6 +171,19 @@ func (j *JeopardyGame) answer(payload map[string]any) (any, error) {
 	if j.currentQuestion == nil {
 		return nil, fmt.Errorf("no active question")
 	}
+	if j.phase != PhaseActivePlayerAnswering && j.phase != PhaseBuzzerPhase {
+		return nil, fmt.Errorf("cannot judge answer in phase %s", j.phase)
+	}
+	if j.phase == PhaseActivePlayerAnswering {
+		active := j.room.ActivePlayer()
+		if active == nil || active.ID != playerID {
+			return nil, fmt.Errorf("player is not the active player")
+		}
+	} else {
+		if playerID != j.buzzedPlayerID {
+			return nil, fmt.Errorf("player has not buzzed")
+		}
+	}
 
 	points := j.currentQuestion.Points
 	// Half points for buzzer-phase correct answers
