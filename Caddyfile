@@ -15,7 +15,7 @@
     }
 
     # Player-Frontend (unter /player)
-    handle /player* {
+    handle_path /player/* {
         root * /srv/player
         try_files {path} /index.html
         file_server
