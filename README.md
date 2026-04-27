@@ -13,6 +13,11 @@ games/
 
 Der Admin öffnet das Admin-Frontend, erstellt einen Room und lädt ein Quiz hoch. Spieler beitreten über den QR-Code / Room-Code im Player-Frontend.
 
+Weitere Dokumentation:
+- [`docs/PROJECT_OVERVIEW.md`](docs/PROJECT_OVERVIEW.md) – Architektur, REST-API, WS-Protokoll
+- [`docs/testing/TESTPLAN.md`](docs/testing/TESTPLAN.md) – Manueller Testplan
+- [`docs/TODO.md`](docs/TODO.md) – Projekt-Backlog
+
 ---
 
 ## Voraussetzungen
@@ -49,6 +54,17 @@ npm install
 npm run dev
 # läuft auf http://localhost:5174
 ```
+
+---
+
+## Tests
+
+```bash
+cd backend
+go test ./...
+```
+
+Abgedeckt: `game/core` (Manager, Room), `game/jeopardy` (Spiellogik), `api` (REST-Endpunkte).
 
 ---
 

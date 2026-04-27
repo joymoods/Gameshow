@@ -106,6 +106,7 @@ Server → Player clients only:
 |---|---|---|
 | `GET` | `/api/rooms` | Alle aktiven Rooms auflisten |
 | `POST` | `/api/rooms` | Room erstellen (`game_type` pflicht) |
+| `DELETE` | `/api/rooms/:code` | Room löschen |
 | `GET` | `/api/rooms/:code` | Room-Snapshot (für Reconnect) |
 | `POST` | `/api/rooms/:code/quiz` | Quiz hochladen (Jeopardy) |
 | `GET` | `/api/rooms/:code/export` | Quiz als JSON exportieren |
