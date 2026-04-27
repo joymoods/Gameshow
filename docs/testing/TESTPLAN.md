@@ -60,9 +60,10 @@ Alle drei Container müssen `running` sein: `backend`, `caddy`.
 
 ### Beispiel-Quiz (JSON)
 
-Dieses JSON wird in mehreren Tests verwendet. Speichere es als `/tmp/quiz.json`:
+Dieses Quiz wird in mehreren Tests benötigt – einmal als Datei für `curl`-Befehle und einmal zum Importieren im Browser. Erstelle die Datei **einmalig zu Beginn** mit diesem Befehl im Terminal:
 
-```json
+```bash
+cat > /tmp/quiz.json << 'EOF'
 {
   "categories": [
     {
@@ -115,7 +116,17 @@ Dieses JSON wird in mehreren Tests verwendet. Speichere es als `/tmp/quiz.json`:
     }
   ]
 }
+EOF
 ```
+
+Prüfen ob die Datei korrekt erstellt wurde:
+
+```bash
+cat /tmp/quiz.json | jq .categories[].name
+# Ausgabe: "Geographie" und "Wissenschaft"
+```
+
+> Diese Datei wird in Tests 4.1 (curl-Upload), 7.7 (Browser-Import) und 13 (Integration) verwendet. Downloade sie auch auf deinen lokalen Rechner, falls du sie im Browser-Datei-Dialog auswählen musst (der Browser sieht `/tmp/` auf dem Server nicht direkt).
 
 ---
 
@@ -247,13 +258,29 @@ curl -s -X POST http://192.168.178.130/api/rooms/$CODE/players/shuffle
 
 ### 4.1 Quiz hochladen
 
+**Vorbereitung:** `$CODE` muss gesetzt sein (aus Test 3.1). `/tmp/quiz.json` muss existieren (aus Sektion 1).
+
 ```bash
+# Sicherstellen dass CODE gesetzt ist
+echo "Lade Quiz in Room: $CODE"
+
 curl -s -X POST http://192.168.178.130/api/rooms/$CODE/quiz \
   -H "Content-Type: application/json" \
   -d @/tmp/quiz.json | jq .
 ```
 
-**Erwartetes Ergebnis:** HTTP 200, Board mit Kategorien und Fragen
+Der `@`-Prefix bei `-d @/tmp/quiz.json` bedeutet: Dateiinhalt als Request-Body senden (nicht den String `@/tmp/quiz.json`).
+
+**Erwartetes Ergebnis:** HTTP 200, Response enthält das Board mit 2 Kategorien und je 2 Fragen:
+
+```json
+{
+  "categories": [
+    { "name": "Geographie", "questions": [...] },
+    { "name": "Wissenschaft", "questions": [...] }
+  ]
+}
+```
 
 ### 4.2 Quiz exportieren
 
@@ -410,7 +437,13 @@ curl -s -X POST http://192.168.178.130/api/media/upload \
 
 ### 6.8 Spiel starten
 
-**Vorbereitung:** Quiz hochladen (Test 4.1) und mindestens 1 Spieler in der Lobby.
+**Vorbereitung:**
+- Ein Quiz muss in den Room geladen sein. Entweder:
+  - **Per curl** (Terminal): Test 4.1 durchführen → `curl -X POST .../quiz -d @/tmp/quiz.json`
+  - **Per Builder** (Browser): Quiz im Builder bauen und über "Upload to Room" hochladen (Test 7.8)
+- Mindestens 1 Spieler muss in der Lobby sein (Test 6.5)
+
+> Ohne Quiz lässt sich das Spiel **nicht starten** – der Button bleibt deaktiviert oder zeigt einen Fehler.
 
 1. "Spiel starten"-Button klicken
 2. Admin wird zur ControlPage navigiert
@@ -472,18 +505,25 @@ curl -s -X POST http://192.168.178.130/api/media/upload \
 
 ### 7.7 Quiz aus JSON importieren
 
-1. "Import JSON"-Button klicken
-2. `/tmp/quiz.json` auswählen
-3. Quiz wird geladen
+> **Hinweis:** Der Browser-Datei-Dialog zeigt Dateien auf deinem **lokalen Rechner**, nicht auf dem Server. `/tmp/quiz.json` liegt auf dem Server (`192.168.178.130`). Du hast zwei Möglichkeiten:
+> - **Option A:** Datei vorher auf deinen lokalen Rechner herunterladen (z.B. per `scp devboy@192.168.178.130:/tmp/quiz.json ~/Downloads/`)
+> - **Option B:** Den Dateiinhalt aus Sektion 1 kopieren, lokal als `quiz.json` speichern, dann auswählen
 
-**Erwartetes Ergebnis:** Kategorien und Fragen aus der Datei erscheinen im Builder
+1. "Import JSON"-Button im Quiz-Builder klicken
+2. Datei-Dialog öffnet sich → `quiz.json` vom lokalen Rechner auswählen
+3. Quiz wird geladen (kein Reload nötig, passiert sofort im Browser)
+
+**Erwartetes Ergebnis:** Kategorien "Geographie" und "Wissenschaft" mit je 2 Fragen erscheinen im Builder
 
 ### 7.8 Quiz zu Room hochladen
 
-1. Room-Code in das Upload-Feld eingeben
-2. "Upload to Room"-Button klicken
+**Vorbereitung:** Ein Room muss existieren und sein Code bekannt sein (aus Test 5.2 oder 3.1).
 
-**Erwartetes Ergebnis:** Erfolgs-Meldung, Room hat jetzt das Quiz geladen
+1. Im Quiz-Builder oben ein Feld für den Room-Code suchen (z.B. "Upload to Room" oder ähnliche Bezeichnung)
+2. Den 6-stelligen Room-Code eingeben (z.B. `ABCXYZ`)
+3. "Upload to Room"-Button klicken
+
+**Erwartetes Ergebnis:** Erfolgs-Meldung erscheint. Zur Kontrolle: `curl -s http://192.168.178.130/api/rooms/$CODE/export | jq .` sollte jetzt das Quiz zurückgeben.
 
 ---
 
@@ -773,7 +813,9 @@ curl -s -X POST http://192.168.178.130/api/media/upload \
 1. Admin: `http://192.168.178.130/` öffnen
 2. Admin: "Neuen Room erstellen" klicken → Code merken
 3. Admin: Zur LobbyPage navigieren
-4. Admin: Quiz hochladen (aus Test 4.1 oder via Builder)
+4. Admin: Quiz hochladen – entweder:
+   - **Per Terminal:** `curl -s -X POST http://192.168.178.130/api/rooms/$CODE/quiz -H "Content-Type: application/json" -d @/tmp/quiz.json`
+   - **Per Browser:** `/builder/jeopardy` öffnen → Import JSON → quiz.json auswählen → Room-Code eingeben → "Upload to Room"
 5. Player 1: `http://192.168.178.130/player` öffnen, Code eingeben, Name "Alice", beitreten
 6. Player 2: Inkognito-Tab, gleiche URL, Name "Bob", beitreten
 7. Admin: Beide Spieler erscheinen in der Lobby
