@@ -59,6 +59,10 @@ const (
 	// Client → Server
 	MsgJoinGame = "JOIN_GAME"
 	MsgBuzz     = "BUZZ"
+	MsgPing     = "PING"
+
+	// Server → Client
+	MsgPong = "PONG"
 
 	// Server → All clients
 	MsgGameState      = "GAME_STATE"

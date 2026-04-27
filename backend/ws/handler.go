@@ -2,6 +2,7 @@ package ws
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"net/http"
 	"strings"
@@ -11,7 +12,6 @@ import (
 
 	"github.com/google/uuid"
 	"nhooyr.io/websocket"
-	"nhooyr.io/websocket/wsjson"
 )
 
 type Handler struct {
@@ -63,15 +63,24 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	go c.writePump(ctx)
 
-	// Read loop
+	// Read loop — use raw conn.Read so we control parse errors without the
+	// library closing the connection on bad JSON.
 	for {
-		var msg IncomingMessage
-		if err := wsjson.Read(ctx, conn, &msg); err != nil {
-			if !strings.Contains(err.Error(), "EOF") &&
-				!strings.Contains(err.Error(), "close") {
+		_, raw, err := conn.Read(ctx)
+		if err != nil {
+			errStr := err.Error()
+			if !strings.Contains(errStr, "EOF") && !strings.Contains(errStr, "close") {
 				log.Printf("read error for client %s: %v", clientID, err)
 			}
 			return
+		}
+		var msg IncomingMessage
+		if err := json.Unmarshal(raw, &msg); err != nil {
+			log.Printf("invalid JSON from client %s: %v", clientID, err)
+			c.Send(OutgoingMessage{Type: MsgError, Payload: ErrorPayload{
+				Message: `invalid JSON, expected: {"type":"...","payload":{...}}`,
+			}})
+			continue
 		}
 		h.route(c, msg)
 	}
@@ -83,8 +92,13 @@ func (h *Handler) route(c *Client, msg IncomingMessage) {
 		h.handleJoinGame(c, msg.Payload)
 	case MsgBuzz:
 		h.handleBuzz(c)
+	case MsgPing:
+		c.Send(OutgoingMessage{Type: MsgPong, Payload: msg.Payload})
 	default:
 		log.Printf("unknown message type: %s", msg.Type)
+		c.Send(OutgoingMessage{Type: MsgError, Payload: ErrorPayload{
+			Message: "unknown message type: " + msg.Type,
+		}})
 	}
 }
 
