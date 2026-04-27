@@ -1,0 +1,1103 @@
+{
+  "info": {
+    "_postman_id": "b7a3f1c2-4d5e-4f60-9abc-de0123456789",
+    "name": "BrainStorm API",
+    "description": "REST API der BrainStorm Multiplayer-Quiz-Plattform.\n\n---\n\n## Voraussetzungen\n\n**1. Backend starten**\n\nEntweder per Docker (empfohlen):\n```\ndocker compose up -d\n```\nOder lokal:\n```\ncd backend && go run .\n```\n\n**2. Environment laden**\n\nIn Postman: Environment `BrainStorm Local` auswählen. `baseUrl` ggf. anpassen:\n- Docker-Stack: `http://192.168.178.130`\n- Lokale Entwicklung: `http://localhost:8080`\n\n---\n\n## Reihenfolge beim Collection Run\n\nDie Folder sind in der richtigen Ablauf-Reihenfolge sortiert:\n\n1. **Room Management** – Room erstellen (`roomCode` wird automatisch gesetzt)\n2. **Game Control** – Quiz hochladen, Spieltyp prüfen\n3. **Players** – Reihenfolge setzen / shufflen\n4. **Question Control** – Fragen öffnen/schließen *(erfordert laufendes Spiel)*\n5. **Answer** – Antworten bewerten *(erfordert offene Frage + `playerId`)*\n6. **Media** – Dateien hochladen\n7. **Cleanup** – Room löschen *(immer zuletzt!)*\n\n> **Hinweis:** Start Game, Question Control und Answer erfordern mindestens einen per WebSocket verbundenen Spieler. Diese Requests schlagen in einem reinen API-Run ohne Spieler erwartungsgemäß fehl – die Tests prüfen in diesem Fall die Fehlerantwort.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Room Management",
+      "item": [
+        {
+          "name": "List Rooms",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Response ist ein Array', () => {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/rooms",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rooms"
+              ]
+            },
+            "description": "Gibt alle aktiven Rooms zurück."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Room",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('Response enthält 6-stelligen Code', () => {",
+                  "    const data = pm.response.json();",
+                  "    pm.expect(data).to.have.property('code');",
+                  "    pm.expect(data.code).to.be.a('string').with.lengthOf(6);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "if (data.code) {",
+                  "    pm.environment.set('roomCode', data.code);",
+                  "    console.log('roomCode gesetzt:', data.code);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"game_type\": \"jeopardy\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/rooms",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rooms"
+              ]
+            },
+            "description": "Erstellt einen neuen Room. Der zurückgegebene `code` wird automatisch als `roomCode` Environment-Variable gesetzt."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Room – fehlender game_type (Fehlerfall)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Fehlermeldung vorhanden', () => {",
+                  "    pm.expect(pm.response.json()).to.have.property('error');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/rooms",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rooms"
+              ]
+            },
+            "description": "Erstellt einen Room ohne `game_type` → muss 400 zurückgeben."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Room",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Room hat erwartete Felder', () => {",
+                  "    const data = pm.response.json();",
+                  "    pm.expect(data).to.have.property('roomCode');",
+                  "    pm.expect(data).to.have.property('room_phase');",
+                  "    pm.expect(data).to.have.property('game_type');",
+                  "    pm.expect(data).to.have.property('scores');",
+                  "    pm.expect(data).to.have.property('activePlayers');",
+                  "});",
+                  "pm.test('room_phase ist LOBBY', () => {",
+                  "    pm.expect(pm.response.json().room_phase).to.equal('LOBBY');",
+                  "});",
+                  "pm.test('game_type ist jeopardy', () => {",
+                  "    pm.expect(pm.response.json().game_type).to.equal('jeopardy');",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "if (data.scores && data.scores.length > 0) {",
+                  "    pm.environment.set('playerId', data.scores[0].id);",
+                  "    console.log('playerId gesetzt:', data.scores[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/rooms/{{roomCode}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rooms",
+                "{{roomCode}}"
+              ]
+            },
+            "description": "Gibt den aktuellen Snapshot des Rooms zurück. Setzt `playerId` automatisch auf den ersten Spieler, falls vorhanden."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Room – nicht existierend (Fehlerfall)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 Not Found', () => pm.response.to.have.status(404));",
+                  "pm.test('Fehlermeldung vorhanden', () => {",
+                  "    pm.expect(pm.response.json()).to.have.property('error');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/rooms/XXXXXX",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rooms",
+                "XXXXXX"
+              ]
+            },
+            "description": "Ruft einen nicht existierenden Room ab → muss 404 zurückgeben."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Game Control",
+      "item": [
+        {
+          "name": "Upload Quiz",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Status ok', () => {",
+                  "    pm.expect(pm.response.json().status).to.equal('ok');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"id\": \"cat-1\",\n    \"name\": \"Geographie\",\n    \"questions\": [\n      {\n        \"id\": \"q-1\",\n        \"categoryId\": \"cat-1\",\n        \"points\": 100,\n        \"text\": \"Hauptstadt von Deutschland?\",\n        \"answer\": \"Berlin\",\n        \"imageUrl\": \"\",\n        \"audioUrl\": \"\",\n        \"videoUrl\": \"\",\n        \"played\": false\n      },\n      {\n        \"id\": \"q-2\",\n        \"categoryId\": \"cat-1\",\n        \"points\": 200,\n        \"text\": \"Längster Fluss der Welt?\",\n        \"answer\": \"Nil\",\n        \"imageUrl\": \"\",\n        \"audioUrl\": \"\",\n        \"videoUrl\": \"\",\n        \"played\": false\n      }\n    ]\n  },\n  {\n    \"id\": \"cat-2\",\n    \"name\": \"Wissenschaft\",\n    \"questions\": [\n      {\n        \"id\": \"q-3\",\n        \"categoryId\": \"cat-2\",\n        \"points\": 100,\n        \"text\": \"Chemisches Symbol für Wasser?\",\n        \"answer\": \"H2O\",\n        \"imageUrl\": \"\",\n        \"audioUrl\": \"\",\n        \"videoUrl\": \"\",\n        \"played\": false\n      },\n      {\n        \"id\": \"q-4\",\n        \"categoryId\": \"cat-2\",\n        \"points\": 200,\n        \"text\": \"Wie viele Planeten hat unser Sonnensystem?\",\n        \"answer\": \"8\",\n        \"imageUrl\": \"\",\n        \"audioUrl\": \"\",\n        \"videoUrl\": \"\",\n        \"played\": false\n      }\n    ]\n  }\n]"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/rooms/{{roomCode}}/quiz",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rooms",
+                "{{roomCode}}",
+                "quiz"
+              ]
+            },
+            "description": "Lädt ein Jeopardy-Quiz in den Room. Body ist ein JSON-Array von Kategorien (nicht in ein Objekt eingewickelt). Überschreibt ein vorhandenes Board."
+          },
+          "response": []
+        },
+        {
+          "name": "Export Quiz",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Export ist ein Array', () => {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});",
+                  "pm.test('Export enthält 2 Kategorien', () => {",
+                  "    pm.expect(pm.response.json()).to.have.lengthOf(2);",
+                  "});",
+                  "pm.test('Jede Kategorie hat id, name und questions', () => {",
+                  "    pm.response.json().forEach(cat => {",
+                  "        pm.expect(cat).to.have.all.keys('id', 'name', 'questions');",
+                  "        pm.expect(cat.questions).to.be.an('array').with.length.above(0);",
+                  "    });",
+                  "});",
+                  "pm.test('Fragen enthalten Antwortfelder', () => {",
+                  "    const q = pm.response.json()[0].questions[0];",
+                  "    pm.expect(q).to.have.property('id');",
+                  "    pm.expect(q).to.have.property('points');",
+                  "    pm.expect(q).to.have.property('text');",
+                  "    pm.expect(q).to.have.property('answer');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/rooms/{{roomCode}}/export",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rooms",
+                "{{roomCode}}",
+                "export"
+              ]
+            },
+            "description": "Exportiert das aktuelle Quiz des Rooms als JSON-Array (inkl. Antworten)."
+          },
+          "response": []
+        },
+        {
+          "name": "Switch Game Type",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Status ok', () => {",
+                  "    pm.expect(pm.response.json().status).to.equal('ok');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"game_type\": \"jeopardy\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/rooms/{{roomCode}}/game",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rooms",
+                "{{roomCode}}",
+                "game"
+              ]
+            },
+            "description": "Wechselt den Spieltyp des Rooms. Nur in Phase `LOBBY` erlaubt."
+          },
+          "response": []
+        },
+        {
+          "name": "Start Game",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 oder 400', () => {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 400]);",
+                  "});",
+                  "pm.test('Response ist JSON', () => pm.response.to.be.json);",
+                  "pm.test('Bei 200: status = started', () => {",
+                  "    if (pm.response.code === 200) {",
+                  "        pm.expect(pm.response.json().status).to.equal('started');",
+                  "    }",
+                  "});",
+                  "pm.test('Bei 400: Fehlermeldung vorhanden', () => {",
+                  "    if (pm.response.code === 400) {",
+                  "        pm.expect(pm.response.json()).to.have.property('error');",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/rooms/{{roomCode}}/start",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rooms",
+                "{{roomCode}}",
+                "start"
+              ]
+            },
+            "description": "Startet das Spiel.\n\n⚠️ Erfordert mindestens einen per WebSocket verbundenen Spieler und ein geladenes Quiz. Schlägt ohne Spieler mit 400 fehl."
+          },
+          "response": []
+        },
+        {
+          "name": "End Game",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Status game_over', () => {",
+                  "    pm.expect(pm.response.json().status).to.equal('game_over');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/rooms/{{roomCode}}/end",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rooms",
+                "{{roomCode}}",
+                "end"
+              ]
+            },
+            "description": "Beendet das Spiel sofort. Room-Phase wechselt zu `GAME_OVER`."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Players",
+      "item": [
+        {
+          "name": "Shuffle Players",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Status ok', () => {",
+                  "    pm.expect(pm.response.json().status).to.equal('ok');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/rooms/{{roomCode}}/players/shuffle",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rooms",
+                "{{roomCode}}",
+                "players",
+                "shuffle"
+              ]
+            },
+            "description": "Mischt die Spieler-Reihenfolge zufällig."
+          },
+          "response": []
+        },
+        {
+          "name": "Set Player Order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Status ok', () => {",
+                  "    pm.expect(pm.response.json().status).to.equal('ok');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\"{{playerId}}\"]"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/rooms/{{roomCode}}/players/order",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rooms",
+                "{{roomCode}}",
+                "players",
+                "order"
+              ]
+            },
+            "description": "Setzt die Spieler-Reihenfolge als JSON-Array von Player-IDs."
+          },
+          "response": []
+        },
+        {
+          "name": "Set Player Score",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 oder 404', () => {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+                  "});",
+                  "pm.test('Response ist JSON', () => pm.response.to.be.json);",
+                  "pm.test('Bei 200: Status ok', () => {",
+                  "    if (pm.response.code === 200) {",
+                  "        pm.expect(pm.response.json().status).to.equal('ok');",
+                  "    }",
+                  "});",
+                  "pm.test('Bei 404: playerId fehlt oder ungültig', () => {",
+                  "    if (pm.response.code === 404) {",
+                  "        pm.expect(pm.response.json()).to.have.property('error');",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"score\": 500\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/rooms/{{roomCode}}/players/{{playerId}}/score",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rooms",
+                "{{roomCode}}",
+                "players",
+                "{{playerId}}",
+                "score"
+              ]
+            },
+            "description": "Setzt den Score eines Spielers manuell.\n\n⚠️ `playerId` wird automatisch durch Get Room gesetzt, wenn ein Spieler verbunden ist."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Question Control",
+      "item": [
+        {
+          "name": "Open Question",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 oder 400', () => {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 400]);",
+                  "});",
+                  "pm.test('Response ist JSON', () => pm.response.to.be.json);",
+                  "pm.test('Bei 200: Status ok', () => {",
+                  "    if (pm.response.code === 200) {",
+                  "        pm.expect(pm.response.json().status).to.equal('ok');",
+                  "    }",
+                  "});",
+                  "pm.test('Bei 400: Fehlermeldung vorhanden', () => {",
+                  "    if (pm.response.code === 400) {",
+                  "        pm.expect(pm.response.json()).to.have.property('error');",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/rooms/{{roomCode}}/question/{{questionId}}/open",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rooms",
+                "{{roomCode}}",
+                "question",
+                "{{questionId}}",
+                "open"
+              ]
+            },
+            "description": "Öffnet eine Frage. Phase wechselt zu `ACTIVE_PLAYER_ANSWERING`.\n\n⚠️ Erfordert Phase `IN_PROGRESS`. `questionId` in der Environment auf eine gültige Fragen-ID setzen (z.B. `q-1`)."
+          },
+          "response": []
+        },
+        {
+          "name": "Reveal Answer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 oder 400', () => {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 400]);",
+                  "});",
+                  "pm.test('Response ist JSON', () => pm.response.to.be.json);",
+                  "pm.test('Bei 200: Status ok', () => {",
+                  "    if (pm.response.code === 200) {",
+                  "        pm.expect(pm.response.json().status).to.equal('ok');",
+                  "    }",
+                  "});",
+                  "pm.test('Bei 400: Fehlermeldung vorhanden', () => {",
+                  "    if (pm.response.code === 400) {",
+                  "        pm.expect(pm.response.json()).to.have.property('error');",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/rooms/{{roomCode}}/question/reveal",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rooms",
+                "{{roomCode}}",
+                "question",
+                "reveal"
+              ]
+            },
+            "description": "Deckt die korrekte Antwort auf. Broadcastet `ANSWER_REVEALED` an alle Clients."
+          },
+          "response": []
+        },
+        {
+          "name": "End Buzzer Phase",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 oder 400', () => {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 400]);",
+                  "});",
+                  "pm.test('Response ist JSON', () => pm.response.to.be.json);",
+                  "pm.test('Bei 200: Status ok', () => {",
+                  "    if (pm.response.code === 200) {",
+                  "        pm.expect(pm.response.json().status).to.equal('ok');",
+                  "    }",
+                  "});",
+                  "pm.test('Bei 400: Fehlermeldung vorhanden', () => {",
+                  "    if (pm.response.code === 400) {",
+                  "        pm.expect(pm.response.json()).to.have.property('error');",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/rooms/{{roomCode}}/question/end-buzzer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rooms",
+                "{{roomCode}}",
+                "question",
+                "end-buzzer"
+              ]
+            },
+            "description": "Beendet die Buzzer-Phase ohne Bewertung."
+          },
+          "response": []
+        },
+        {
+          "name": "Close Question",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 oder 400', () => {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 400]);",
+                  "});",
+                  "pm.test('Response ist JSON', () => pm.response.to.be.json);",
+                  "pm.test('Bei 200: Status ok', () => {",
+                  "    if (pm.response.code === 200) {",
+                  "        pm.expect(pm.response.json().status).to.equal('ok');",
+                  "    }",
+                  "});",
+                  "pm.test('Bei 400: Fehlermeldung vorhanden', () => {",
+                  "    if (pm.response.code === 400) {",
+                  "        pm.expect(pm.response.json()).to.have.property('error');",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/rooms/{{roomCode}}/question/close",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rooms",
+                "{{roomCode}}",
+                "question",
+                "close"
+              ]
+            },
+            "description": "Schließt die aktuelle Frage ohne Bewertung. Markiert die Frage als gespielt."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Answer",
+      "item": [
+        {
+          "name": "Submit Answer (correct)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 oder 400', () => {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 400]);",
+                  "});",
+                  "pm.test('Response ist JSON', () => pm.response.to.be.json);",
+                  "pm.test('Bei 200: delta und newScore vorhanden', () => {",
+                  "    if (pm.response.code === 200) {",
+                  "        const data = pm.response.json();",
+                  "        pm.expect(data).to.have.property('delta');",
+                  "        pm.expect(data).to.have.property('newScore');",
+                  "        pm.expect(data.delta).to.be.a('number').and.above(0);",
+                  "    }",
+                  "});",
+                  "pm.test('Bei 400: Fehlermeldung vorhanden', () => {",
+                  "    if (pm.response.code === 400) {",
+                  "        pm.expect(pm.response.json()).to.have.property('error');",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"playerId\": \"{{playerId}}\",\n  \"correct\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/rooms/{{roomCode}}/answer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rooms",
+                "{{roomCode}}",
+                "answer"
+              ]
+            },
+            "description": "Bewertet die Antwort als richtig. Erwartet bei Erfolg `delta > 0` und `newScore` im Response."
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Answer (wrong)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 oder 400', () => {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 400]);",
+                  "});",
+                  "pm.test('Response ist JSON', () => pm.response.to.be.json);",
+                  "pm.test('Bei 200: delta negativ und newScore vorhanden', () => {",
+                  "    if (pm.response.code === 200) {",
+                  "        const data = pm.response.json();",
+                  "        pm.expect(data).to.have.property('delta');",
+                  "        pm.expect(data).to.have.property('newScore');",
+                  "        pm.expect(data.delta).to.be.a('number').and.below(0);",
+                  "    }",
+                  "});",
+                  "pm.test('Bei 400: Fehlermeldung vorhanden', () => {",
+                  "    if (pm.response.code === 400) {",
+                  "        pm.expect(pm.response.json()).to.have.property('error');",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"playerId\": \"{{playerId}}\",\n  \"correct\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/rooms/{{roomCode}}/answer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rooms",
+                "{{roomCode}}",
+                "answer"
+              ]
+            },
+            "description": "Bewertet die Antwort als falsch. Erwartet bei Erfolg `delta < 0` und `newScore` im Response."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Media",
+      "item": [
+        {
+          "name": "Upload Media",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 oder 400', () => {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 400]);",
+                  "});",
+                  "pm.test('Bei 200: url-Feld vorhanden und korrekt formatiert', () => {",
+                  "    if (pm.response.code === 200) {",
+                  "        const data = pm.response.json();",
+                  "        pm.expect(data).to.have.property('url');",
+                  "        pm.expect(data.url).to.match(/^\\/media\\/.+/);",
+                  "    }",
+                  "});",
+                  "pm.test('Bei 400: Datei fehlt oder Typ nicht erlaubt', () => {",
+                  "    if (pm.response.code === 400) {",
+                  "        pm.expect(pm.response.text()).to.not.be.empty;",
+                  "    }",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const data = pm.response.json();",
+                  "    if (data.url) {",
+                  "        const filename = data.url.replace('/media/', '');",
+                  "        pm.environment.set('mediaFilename', filename);",
+                  "        console.log('mediaFilename gesetzt:', filename);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "",
+                  "description": "Erlaubte Typen: JPEG, PNG, GIF, WebP, MP3, WAV, OGG, MP4, WebM. Max. 100 MB."
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/media/upload",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "media",
+                "upload"
+              ]
+            },
+            "description": "Lädt eine Mediendatei hoch. `mediaFilename` wird automatisch für Get Media File gesetzt.\n\n**Erlaubte Typen:** JPEG, PNG, GIF, WebP, MP3, WAV, OGG, MP4, WebM — Max. 100 MB"
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Media – ungültiger Typ (Fehlerfall)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Fehlermeldung vorhanden', () => {",
+                  "    pm.expect(pm.response.text().trim()).to.not.be.empty;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "",
+                  "description": "Eine .txt-Datei oder andere nicht erlaubte Datei einfügen."
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/media/upload",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "media",
+                "upload"
+              ]
+            },
+            "description": "Upload mit nicht erlaubtem Dateityp (z.B. .txt) → muss 400 zurückgeben."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Media File",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 oder 404', () => {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+                  "});",
+                  "pm.test('Bei 200 mit Datei: Content-Type ist ein Medientyp', () => {",
+                  "    const filename = pm.environment.get('mediaFilename');",
+                  "    if (pm.response.code === 200 && filename) {",
+                  "        const ct = pm.response.headers.get('Content-Type');",
+                  "        const mainType = ct ? ct.split('/')[0] : '';",
+                  "        pm.expect(mainType).to.be.oneOf(['image', 'audio', 'video']);",
+                  "    }",
+                  "});",
+                  "pm.test('Bei 404: mediaFilename war leer oder Datei existiert nicht', () => {",
+                  "    if (pm.response.code === 404) {",
+                  "        console.warn('mediaFilename nicht gesetzt oder Datei nicht gefunden');",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/media/{{mediaFilename}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "media",
+                "{{mediaFilename}}"
+              ]
+            },
+            "description": "Ruft eine hochgeladene Mediendatei ab. `mediaFilename` wird automatisch nach Upload Media gesetzt."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Cleanup",
+      "item": [
+        {
+          "name": "Delete Room",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Status closed', () => {",
+                  "    pm.expect(pm.response.json().status).to.equal('closed');",
+                  "});",
+                  "",
+                  "pm.environment.unset('roomCode');",
+                  "console.log('roomCode aus Environment entfernt');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/rooms/{{roomCode}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "rooms",
+                "{{roomCode}}"
+              ]
+            },
+            "description": "Löscht den Room und trennt alle verbundenen Player-Clients. Entfernt `roomCode` aus der Environment.\n\n⚠️ Immer zuletzt ausführen!"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": []
+}
