@@ -58,71 +58,70 @@ Alle drei Container müssen `running` sein: `backend`, `caddy`.
 - Optional: Smartphone für QR-Code-Scan
 - Optional: [websocat](https://github.com/vi/websocat) für WebSocket-Tests
 
+
 ### Beispiel-Quiz (JSON)
 
 Dieses Quiz wird in mehreren Tests benötigt – einmal als Datei für `curl`-Befehle und einmal zum Importieren im Browser. Erstelle die Datei **einmalig zu Beginn** mit diesem Befehl im Terminal:
 
 ```bash
 cat > /tmp/quiz.json << 'EOF'
-{
-  "categories": [
-    {
-      "id": "cat-1",
-      "name": "Geographie",
-      "questions": [
-        {
-          "id": "q-1",
-          "points": 100,
-          "text": "Hauptstadt von Deutschland?",
-          "answer": "Berlin",
-          "imageUrl": "",
-          "audioUrl": "",
-          "videoUrl": ""
-        },
-        {
-          "id": "q-2",
-          "points": 200,
-          "text": "Längster Fluss der Welt?",
-          "answer": "Nil",
-          "imageUrl": "",
-          "audioUrl": "",
-          "videoUrl": ""
-        }
-      ]
-    },
-    {
-      "id": "cat-2",
-      "name": "Wissenschaft",
-      "questions": [
-        {
-          "id": "q-3",
-          "points": 100,
-          "text": "Chemisches Symbol für Wasser?",
-          "answer": "H2O",
-          "imageUrl": "",
-          "audioUrl": "",
-          "videoUrl": ""
-        },
-        {
-          "id": "q-4",
-          "points": 200,
-          "text": "Wie viele Planeten hat unser Sonnensystem?",
-          "answer": "8",
-          "imageUrl": "",
-          "audioUrl": "",
-          "videoUrl": ""
-        }
-      ]
-    }
-  ]
-}
+[
+  {
+    "id": "cat-1",
+    "name": "Geographie",
+    "questions": [
+      {
+        "id": "q-1",
+        "points": 100,
+        "text": "Hauptstadt von Deutschland?",
+        "answer": "Berlin",
+        "imageUrl": "",
+        "audioUrl": "",
+        "videoUrl": ""
+      },
+      {
+        "id": "q-2",
+        "points": 200,
+        "text": "Längster Fluss der Welt?",
+        "answer": "Nil",
+        "imageUrl": "",
+        "audioUrl": "",
+        "videoUrl": ""
+      }
+    ]
+  },
+  {
+    "id": "cat-2",
+    "name": "Wissenschaft",
+    "questions": [
+      {
+        "id": "q-3",
+        "points": 100,
+        "text": "Chemisches Symbol für Wasser?",
+        "answer": "H2O",
+        "imageUrl": "",
+        "audioUrl": "",
+        "videoUrl": ""
+      },
+      {
+        "id": "q-4",
+        "points": 200,
+        "text": "Wie viele Planeten hat unser Sonnensystem?",
+        "answer": "8",
+        "imageUrl": "",
+        "audioUrl": "",
+        "videoUrl": ""
+      }
+    ]
+  }
+]
 EOF
 ```
 
 Prüfen ob die Datei korrekt erstellt wurde:
 
 ```bash
-cat /tmp/quiz.json | jq .categories[].name
+cat /tmp/quiz.json | jq .[].name
 # Ausgabe: "Geographie" und "Wissenschaft"
 ```
 
@@ -234,10 +233,10 @@ curl -s http://192.168.178.130/api/rooms/$TEMP
 ### 3.5 Spieler-Reihenfolge setzen (API)
 
 ```bash
-# Setzt Player-Order (IDs müssen existieren – nach JOIN testen)
+# Setzt Player-Order – Body ist ein JSON-Array mit Spieler-IDs (leer = keine Änderung)
 curl -s -X POST http://192.168.178.130/api/rooms/$CODE/players/order \
   -H "Content-Type: application/json" \
-  -d '{"order": []}'
+  -d '[]'
 ```
 
 **Erwartetes Ergebnis:** HTTP 200

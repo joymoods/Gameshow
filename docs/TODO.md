@@ -82,3 +82,5 @@
 ### Allgemein
 - [x] Abschluss-Manuelltest: vollständige Jeopardy-Runde (Join → Lobby → Spiel → End)
 - [x] Auth für Admin-Frontend (einfacher PIN-Schutz reicht für Heimnetz)
+- [x] Debugsession: 7 Bugs behoben (Antwort in QUESTION_OPENED, Quiz-Pflicht vor Start, closeQuestion-Guard, API-Responses, WaitingPage-Reaktivität)
+- [x] Debugsession 2 (2026-04-28): 5 weitere Bugs behoben — `answer` nach GAME_STATE-Restore, WaitingPage ROOM_RESET-Navigation, reveal()-Error ohne aktive Frage, globales ResetPlayerClients beim Raum-Erstellen, WS-URL-Protokoll im Admin-Frontend; `PhaseLobby`-Konstante eingeführt
