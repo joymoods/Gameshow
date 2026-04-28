@@ -85,3 +85,4 @@
 - [x] Debugsession: 7 Bugs behoben (Antwort in QUESTION_OPENED, Quiz-Pflicht vor Start, closeQuestion-Guard, API-Responses, WaitingPage-Reaktivität)
 - [x] Debugsession 2 (2026-04-28): 5 weitere Bugs behoben — `answer` nach GAME_STATE-Restore, WaitingPage ROOM_RESET-Navigation, reveal()-Error ohne aktive Frage, globales ResetPlayerClients beim Raum-Erstellen, WS-URL-Protokoll im Admin-Frontend; `PhaseLobby`-Konstante eingeführt
 - [x] Debugsession 3 (2026-04-28): 4 Bugs behoben — Deadlock-Risiko (Lock-Order-Inversion r.mu/j.mu in Room.Snapshot), VITE_API_URL fehlend in HomePage.tsx und JoinPage.tsx, unnötiger setIdentity-Aufruf in buzz()
+- [x] Debugsession 4 (2026-04-28): 2 Bugs behoben — (1) GAME_STATE leaked Antworten im Board an Player-Clients via WS (BroadcastGameState/handleJoinGame jetzt split: Admin full, Player public ohne answers); (2) handleSwitchGame überschrieb Quiz bei Wechsel auf denselben Spieltyp (guard: nur neues Game-Objekt wenn Typ sich ändert)

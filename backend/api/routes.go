@@ -423,8 +423,12 @@ func (ro *Router) handleSwitchGame(w http.ResponseWriter, r *http.Request, room 
 		writeError(w, http.StatusBadRequest, "unsupported game_type: "+string(body.GameType))
 		return
 	}
-	room.GameType = body.GameType
-	room.Game = jeopardy.New()
+	// Only replace the game instance when the type actually changes.
+	// Replacing on the same type would wipe any loaded quiz data.
+	if room.GameType != body.GameType {
+		room.GameType = body.GameType
+		room.Game = jeopardy.New()
+	}
 	ro.wsHandler.BroadcastGameSwitched(string(body.GameType))
 	ro.wsHandler.BroadcastGameState(room)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
