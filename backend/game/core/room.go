@@ -212,9 +212,12 @@ func (r *Room) ApplyResult(playerID string, correct bool, points int) (int, int)
 // Snapshot returns a serialisable copy of the room state.
 // Game-specific fields (board, currentPhase) are populated from Game.Snapshot()
 // so that the GAME_STATE message keeps its existing shape without breaking the frontend.
+//
+// r.mu is released before calling game.Snapshot() to avoid a lock-order deadlock:
+// HandleAdminCommand holds j.mu → acquires r.mu (ApplyResult), while
+// Room.Snapshot holding r.mu → would try to acquire j.mu (Game.Snapshot).
 func (r *Room) Snapshot() RoomSnapshot {
 	r.mu.RLock()
-	defer r.mu.RUnlock()
 
 	scores := make([]Player, 0, len(r.Players))
 	for _, p := range r.Players {
@@ -237,10 +240,12 @@ func (r *Room) Snapshot() RoomSnapshot {
 		RoomPhase:      string(r.Phase),
 		ActivePlayerID: activePlayerID,
 	}
+	game := r.Game
+	r.mu.RUnlock() // release before calling game.Snapshot() — prevents lock-order inversion
 
 	// Merge game-specific state for backward-compatible GAME_STATE payloads.
-	if r.Game != nil {
-		gs := r.Game.Snapshot()
+	if game != nil {
+		gs := game.Snapshot()
 		snap.GameState = gs
 		if cats, ok := gs["board"].([]Category); ok {
 			snap.Categories = cats

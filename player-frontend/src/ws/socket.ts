@@ -67,10 +67,6 @@ export function send(type: string, payload: unknown = {}) {
 
 export function buzz() {
   send('BUZZ', {});
-  useGameStore.getState().setIdentity(
-    useGameStore.getState().myPlayerId,
-    useGameStore.getState().myPlayerName
-  );
   useGameStore.setState({ hasBuzzed: true, buzzerOpen: false });
 }
 

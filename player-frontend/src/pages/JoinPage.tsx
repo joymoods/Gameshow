@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { connect } from '../ws/socket';
 import { useGameStore } from '../store/gameStore';
 
-const API = `http://${window.location.hostname}`;
+const API = import.meta.env.VITE_API_URL ?? `http://${window.location.hostname}`;
 
 export default function JoinPage() {
   const navigate = useNavigate();
