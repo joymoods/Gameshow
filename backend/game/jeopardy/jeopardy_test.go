@@ -38,18 +38,19 @@ func testCategories() []core.Category {
 }
 
 // setupGame creates a started game with quiz loaded.
+// Quiz must be loaded before OnStart (mirroring the real API flow).
 func setupGame(t *testing.T, playerNames ...string) (*JeopardyGame, *core.Room) {
 	t.Helper()
 	room := makeRoom(playerNames...)
 	game := New()
 	room.Game = game
-	if err := game.OnStart(room); err != nil {
-		t.Fatalf("OnStart failed: %v", err)
-	}
 	if _, err := game.HandleAdminCommand("load_quiz", map[string]any{
 		"categories": testCategories(),
 	}); err != nil {
 		t.Fatalf("load_quiz failed: %v", err)
+	}
+	if err := game.OnStart(room); err != nil {
+		t.Fatalf("OnStart failed: %v", err)
 	}
 	return game, room
 }
@@ -91,11 +92,26 @@ func TestOnStart_SetsPhaseQuestionOpen(t *testing.T) {
 	room := makeRoom("Alice")
 	game := New()
 
+	// OnStart requires a quiz to be loaded first.
+	if _, err := game.HandleAdminCommand("load_quiz", map[string]any{
+		"categories": testCategories(),
+	}); err != nil {
+		t.Fatalf("load_quiz error: %v", err)
+	}
 	if err := game.OnStart(room); err != nil {
 		t.Fatalf("OnStart error: %v", err)
 	}
 	if currentPhase(game) != string(PhaseQuestionOpen) {
 		t.Errorf("expected QUESTION_OPEN after OnStart, got %q", currentPhase(game))
+	}
+}
+
+func TestOnStart_FailsWithoutQuiz(t *testing.T) {
+	room := makeRoom("Alice")
+	game := New()
+
+	if err := game.OnStart(room); err == nil {
+		t.Error("expected error when starting game without quiz loaded")
 	}
 }
 
@@ -506,16 +522,12 @@ func TestReveal_ReturnsAnswer(t *testing.T) {
 	}
 }
 
-func TestReveal_NoQuestion_ReturnsEmpty(t *testing.T) {
+func TestReveal_NoQuestion_ReturnsError(t *testing.T) {
 	game, _ := setupGame(t, "Alice")
 
-	result, err := game.HandleAdminCommand("reveal", map[string]any{})
-	if err != nil {
-		t.Fatalf("reveal error: %v", err)
-	}
-	res := result.(map[string]any)
-	if res["answer"] != "" {
-		t.Errorf("expected empty answer with no active question, got %q", res["answer"])
+	_, err := game.HandleAdminCommand("reveal", map[string]any{})
+	if err == nil {
+		t.Fatal("expected error when revealing with no active question")
 	}
 }
 

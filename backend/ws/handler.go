@@ -189,7 +189,22 @@ func (h *Handler) BroadcastGameState(room *core.Room) {
 }
 
 func (h *Handler) BroadcastQuestionOpened(q *core.Question, categoryName string) {
-	h.hub.Broadcast(OutgoingMessage{
+	// Admin receives the full payload including the answer.
+	h.hub.SendToAdmin(OutgoingMessage{
+		Type: MsgQuestionOpened,
+		Payload: jeopardy.QuestionOpenedPayload{
+			QuestionID: q.ID,
+			Category:   categoryName,
+			Points:     q.Points,
+			Text:       q.Text,
+			Answer:     q.Answer,
+			ImageURL:   q.ImageURL,
+			AudioURL:   q.AudioURL,
+			VideoURL:   q.VideoURL,
+		},
+	})
+	// Players receive the same payload without the answer.
+	h.hub.BroadcastToPlayers(OutgoingMessage{
 		Type: MsgQuestionOpened,
 		Payload: jeopardy.QuestionOpenedPayload{
 			QuestionID: q.ID,

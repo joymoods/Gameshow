@@ -7,6 +7,7 @@ type QuestionOpenedPayload struct {
 	Category   string `json:"category"`
 	Points     int    `json:"points"`
 	Text       string `json:"text"`
+	Answer     string `json:"answer,omitempty"`
 	ImageURL   string `json:"imageUrl,omitempty"`
 	AudioURL   string `json:"audioUrl,omitempty"`
 	VideoURL   string `json:"videoUrl,omitempty"`

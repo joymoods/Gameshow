@@ -5,6 +5,7 @@ package jeopardy
 type JeopardyPhase string
 
 const (
+	PhaseLobby                 JeopardyPhase = "LOBBY"
 	PhaseQuestionOpen          JeopardyPhase = "QUESTION_OPEN"
 	PhaseActivePlayerAnswering JeopardyPhase = "ACTIVE_PLAYER_ANSWERING"
 	PhaseBuzzerPhase           JeopardyPhase = "BUZZER_PHASE"

@@ -71,11 +71,14 @@ func (ro *Router) handleRooms(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, "unsupported game_type: "+string(body.GameType))
 			return
 		}
-		ro.wsHandler.ResetPlayerClients()
 		room := ro.manager.CreateRoom()
 		room.GameType = core.GameTypeJeopardy
 		room.Game = jeopardy.New()
-		writeJSON(w, http.StatusCreated, map[string]string{"code": room.Code})
+		writeJSON(w, http.StatusCreated, map[string]string{
+			"code":       room.Code,
+			"room_phase": string(room.Phase),
+			"game_type":  string(room.GameType),
+		})
 
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -204,7 +207,8 @@ func (ro *Router) handleUploadQuiz(w http.ResponseWriter, r *http.Request, room 
 		return
 	}
 	ro.wsHandler.BroadcastGameState(room)
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	snap := room.Snapshot()
+	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "categories": snap.Categories})
 }
 
 // GET /api/rooms/:code/export

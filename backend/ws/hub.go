@@ -114,6 +114,22 @@ func (h *Hub) ResetRoomPlayers(roomCode string) {
 	}
 }
 
+// BroadcastToPlayers sends a message to all non-admin clients.
+func (h *Hub) BroadcastToPlayers(msg OutgoingMessage) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for _, c := range h.clients {
+		if c.IsAdmin {
+			continue
+		}
+		select {
+		case c.send <- msg:
+		default:
+			log.Printf("send buffer full for client %s, dropping message", c.ID)
+		}
+	}
+}
+
 // SendToClient sends a message to a specific client by player ID.
 func (h *Hub) SendToClient(playerID string, msg OutgoingMessage) {
 	h.mu.RLock()

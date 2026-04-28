@@ -294,6 +294,7 @@ func TestStartGame_WithPlayer(t *testing.T) {
 	code := createRoom(t, srv)
 	room, _ := manager.GetRoom(code)
 	room.AddPlayer("Alice")
+	doPost(t, srv.URL+"/api/rooms/"+code+"/quiz", testCategories())
 
 	resp := doPost(t, srv.URL+"/api/rooms/"+code+"/start", nil)
 	if resp.StatusCode != http.StatusOK {
@@ -317,6 +318,7 @@ func TestEndGame(t *testing.T) {
 	code := createRoom(t, srv)
 	room, _ := manager.GetRoom(code)
 	room.AddPlayer("Alice")
+	doPost(t, srv.URL+"/api/rooms/"+code+"/quiz", testCategories())
 	doPost(t, srv.URL+"/api/rooms/"+code+"/start", nil)
 
 	resp := doPost(t, srv.URL+"/api/rooms/"+code+"/end", nil)

@@ -23,6 +23,7 @@ type JeopardyGame struct {
 
 func New() *JeopardyGame {
 	return &JeopardyGame{
+		phase:         PhaseLobby,
 		buzzedPlayers: make(map[string]bool),
 	}
 }
@@ -116,6 +117,9 @@ func (j *JeopardyGame) HandlePlayerMessage(playerID string, msgType string, _ ma
 func (j *JeopardyGame) OnStart(room *core.Room) error {
 	j.mu.Lock()
 	defer j.mu.Unlock()
+	if len(j.categories) == 0 {
+		return fmt.Errorf("no quiz loaded: upload a quiz before starting")
+	}
 	j.room = room
 	j.phase = PhaseQuestionOpen
 	return nil
@@ -127,6 +131,11 @@ func (j *JeopardyGame) loadQuiz(payload map[string]any) (any, error) {
 	cats, ok := payload["categories"].([]core.Category)
 	if !ok {
 		return nil, fmt.Errorf("invalid categories payload")
+	}
+	for i := range cats {
+		for k := range cats[i].Questions {
+			cats[i].Questions[k].Played = false
+		}
 	}
 	j.categories = cats
 	return map[string]any{"status": "ok"}, nil
@@ -222,12 +231,12 @@ func (j *JeopardyGame) answer(payload map[string]any) (any, error) {
 }
 
 func (j *JeopardyGame) closeQuestion() (any, error) {
-	questionID := ""
-	if j.currentQuestion != nil {
-		questionID = j.currentQuestion.ID
-		j.markQuestionPlayed(questionID)
-		j.currentQuestion = nil
+	if j.currentQuestion == nil {
+		return nil, fmt.Errorf("no active question to close")
 	}
+	questionID := j.currentQuestion.ID
+	j.markQuestionPlayed(questionID)
+	j.currentQuestion = nil
 	j.buzzedPlayers = make(map[string]bool)
 	j.buzzedPlayerID = ""
 
@@ -252,11 +261,10 @@ func (j *JeopardyGame) closeQuestion() (any, error) {
 }
 
 func (j *JeopardyGame) reveal() (any, error) {
-	answer := ""
-	if j.currentQuestion != nil {
-		answer = j.currentQuestion.Answer
+	if j.currentQuestion == nil {
+		return nil, fmt.Errorf("no active question")
 	}
-	return map[string]any{"answer": answer}, nil
+	return map[string]any{"answer": j.currentQuestion.Answer}, nil
 }
 
 func (j *JeopardyGame) endBuzzer() (any, error) {
