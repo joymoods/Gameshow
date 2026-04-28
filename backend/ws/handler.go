@@ -121,7 +121,9 @@ func (h *Handler) handleJoinGame(c *Client, payload map[string]any) {
 	c.PlayerID = player.ID
 	c.RoomCode = room.Code
 
-	h.hub.Broadcast(buildGameState(room))
+	// Send full state to admin, public state (no answers) to all player clients.
+	h.hub.SendToAdmin(buildGameState(room))
+	h.hub.BroadcastToPlayers(buildPublicGameState(room))
 
 	if isNew {
 		h.hub.SendToAdmin(OutgoingMessage{
@@ -174,6 +176,27 @@ func buildGameState(room *core.Room) OutgoingMessage {
 	}
 }
 
+// buildPublicGameState returns a GAME_STATE message with answers stripped from the board.
+// Used for player clients so they cannot read correct answers from WS messages.
+//
+// jeopardy.Snapshot() does a shallow copy of Category structs, meaning the Questions slice
+// headers are copied but their backing arrays are shared. We must deep-copy before clearing.
+func buildPublicGameState(room *core.Room) OutgoingMessage {
+	snap := room.Snapshot()
+	for i := range snap.Categories {
+		questions := make([]core.Question, len(snap.Categories[i].Questions))
+		copy(questions, snap.Categories[i].Questions)
+		for k := range questions {
+			questions[k].Answer = ""
+		}
+		snap.Categories[i].Questions = questions
+	}
+	return OutgoingMessage{
+		Type:    MsgGameState,
+		Payload: snap,
+	}
+}
+
 // ---- Exported helpers for REST API handlers to trigger WS messages ----
 
 func (h *Handler) ResetPlayerClients() {
@@ -185,7 +208,8 @@ func (h *Handler) ResetRoomPlayers(roomCode string) {
 }
 
 func (h *Handler) BroadcastGameState(room *core.Room) {
-	h.hub.Broadcast(buildGameState(room))
+	h.hub.SendToAdmin(buildGameState(room))
+	h.hub.BroadcastToPlayers(buildPublicGameState(room))
 }
 
 func (h *Handler) BroadcastQuestionOpened(q *core.Question, categoryName string) {
