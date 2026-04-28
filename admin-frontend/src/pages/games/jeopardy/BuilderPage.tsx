@@ -6,7 +6,7 @@ import { useLobbyStore } from '../../../store/lobbyStore';
 import type { Category, Question } from '../../../types';
 import type { ToastType } from '../../../App';
 
-const API = import.meta.env.VITE_API_URL ?? `http://${window.location.hostname}:8080`;
+const API = import.meta.env.VITE_API_URL ?? `http://${window.location.hostname}`;
 
 function emptyQuestion(categoryId: string): Question {
   return { id: uuidv4(), categoryId, points: 200, text: '', answer: '', played: false };
@@ -255,7 +255,12 @@ export default function BuilderPage({ toast }: Props) {
     reader.onload = () => {
       try {
         const cats = JSON.parse(reader.result as string) as Category[];
-        setBuilderCategories(cats);
+        if (!Array.isArray(cats)) throw new Error('not an array');
+        const reset = cats.map((c) => ({
+          ...c,
+          questions: c.questions.map((q) => ({ ...q, played: false })),
+        }));
+        setBuilderCategories(reset);
         toast('Quiz importiert', 'success');
       } catch {
         toast('Ungültige JSON-Datei', 'error');

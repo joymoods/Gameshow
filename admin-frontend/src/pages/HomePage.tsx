@@ -4,7 +4,7 @@ import { useLobbyStore } from '../store/lobbyStore';
 import type { GameType, RoomInfo } from '../types';
 import type { ToastType } from '../App';
 
-const API = `http://${window.location.hostname}:8080`;
+const API = `http://${window.location.hostname}`;
 
 const PHASE_LABELS: Record<string, string> = {
   LOBBY: 'Lobby',

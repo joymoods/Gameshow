@@ -1,21 +1,28 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { connect } from '../ws/socket';
 import { useGameStore } from '../store/gameStore';
 
-const API = `http://${window.location.hostname}:8080`;
+const API = `http://${window.location.hostname}`;
 
 export default function JoinPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const setIdentity = useGameStore((s) => s.setIdentity);
 
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState(() =>
+    (searchParams.get('room') ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6)
+  );
   const [name, setName] = useState('');
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
   const codeRef = useRef<HTMLInputElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { codeRef.current?.focus(); }, []);
+  useEffect(() => {
+    if (code.length === 6) nameRef.current?.focus();
+    else codeRef.current?.focus();
+  }, []);
 
   const codeOk = code.length === 6;
   const nameOk = name.trim().length > 0;
@@ -80,6 +87,7 @@ export default function JoinPage() {
           <div>
             <div className="join-field-label">DEIN NAME</div>
             <input
+              ref={nameRef}
               className="join-name-input"
               value={name}
               onChange={(e) => setName(e.target.value.slice(0, 20))}

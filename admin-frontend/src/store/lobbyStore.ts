@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { RoomInfo } from '../types';
 
-const API = `http://${window.location.hostname}:8080`;
+const API = `http://${window.location.hostname}`;
 
 interface LobbyState {
   activeRoomCode: string | null;

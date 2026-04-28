@@ -4,7 +4,7 @@ import { useGameStore } from '../store/gameStore';
 import type { Question } from '../types';
 import type { ToastType } from '../App';
 
-const API = import.meta.env.VITE_API_URL ?? `http://${window.location.hostname}:8080`;
+const API = import.meta.env.VITE_API_URL ?? `http://${window.location.hostname}`;
 
 interface ScoreDelta {
   val: number;
@@ -82,7 +82,7 @@ export default function ControlPage({ toast }: Props) {
     activePlayerId, activePlayerName,
     currentQuestion, phase, roomPhase,
     buzzedPlayerId, buzzedPlayerName,
-    finalScores, resetGameState,
+    finalScores, resetGameState, handleMessage,
   } = useGameStore();
   // Prefer URL param so the page works when navigated directly
   const roomCode = urlCode ?? storeRoomCode;
@@ -154,6 +154,15 @@ export default function ControlPage({ toast }: Props) {
       setAnswering(false);
     }
   }
+
+  // Load current room state on mount so board is populated after page refresh
+  useEffect(() => {
+    if (!roomCode) return;
+    fetch(`${API}/api/rooms/${roomCode}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((snap) => { if (snap) handleMessage({ type: 'GAME_STATE', payload: snap }); })
+      .catch(() => {});
+  }, [roomCode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Warn before leaving while game is running
   useEffect(() => {
@@ -229,7 +238,7 @@ export default function ControlPage({ toast }: Props) {
   const canJudge = currentQuestion && judgingPlayerId &&
     (phase === 'ACTIVE_PLAYER_ANSWERING' || (phase === 'BUZZER_PHASE' && buzzedPlayerId));
 
-  const numRows = board[0]?.questions.length ?? 5;
+  const numRows = board.length > 0 ? Math.max(...board.map((c) => c.questions.length)) : 5;
 
   return (
     <div className="control-layout">
@@ -298,8 +307,8 @@ export default function ControlPage({ toast }: Props) {
                   {showAnswer ? '▲ Antwort verbergen' : '▼ Antwort aufdecken'}
                 </button>
                 {showAnswer && (
-                  (currentQuestion as any).answer ? (
-                    <div className="q-answer-box">{(currentQuestion as any).answer}</div>
+                  currentQuestion.answer ? (
+                    <div className="q-answer-box">{currentQuestion.answer}</div>
                   ) : (
                     <div className="q-no-answer">Keine Antwort hinterlegt</div>
                   )

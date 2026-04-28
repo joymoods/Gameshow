@@ -84,6 +84,7 @@ export interface QuestionOpenedPayload {
   category: string;
   points: number;
   text: string;
+  answer?: string;
   imageUrl?: string;
   audioUrl?: string;
   videoUrl?: string;

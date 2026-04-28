@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { BrowserRouter, Route, Routes, Navigate, useLocation, useParams } from 'react-router-dom';
+import { BrowserRouter, Route, Routes, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { connect } from './ws/socket';
 import BuilderPage from './pages/games/jeopardy/BuilderPage';
 import LobbyPage from './pages/LobbyPage';
@@ -91,14 +91,16 @@ function Nav({ onEndGame }: { onEndGame?: () => void }) {
 function ControlRoute({ toast }: { toast: (msg: string, type?: ToastType) => void }) {
   const { code } = useParams<{ code: string }>();
   const { resetGameState } = useGameStore();
+  const navigate = useNavigate();
 
-  function handleEndGame() {
-    if (!confirm('Spiel wirklich beenden?')) return;
-    fetch(`${import.meta.env.VITE_API_URL ?? `http://${window.location.hostname}:8080`}/api/rooms/${code}/end`, {
-      method: 'POST',
-    }).catch(() => {});
+  async function handleEndGame() {
+    try {
+      await fetch(`${import.meta.env.VITE_API_URL ?? `http://${window.location.hostname}`}/api/rooms/${code}/end`, {
+        method: 'POST',
+      });
+    } catch { /* ignore */ }
     resetGameState();
-    window.location.href = '/';
+    navigate('/');
   }
 
   return (

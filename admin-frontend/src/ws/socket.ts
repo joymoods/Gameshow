@@ -1,7 +1,8 @@
 import { useGameStore } from '../store/gameStore';
 import type { WsMessage } from '../types';
 
-const WS_URL = `ws://${window.location.hostname}:8080/ws?role=admin`;
+const _apiBase = import.meta.env.VITE_API_URL ?? `http://${window.location.hostname}`;
+const WS_URL = _apiBase.replace(/^https/, 'wss').replace(/^http/, 'ws') + '/ws?role=admin';
 
 let socket: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;

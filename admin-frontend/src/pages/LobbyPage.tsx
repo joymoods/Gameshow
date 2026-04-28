@@ -6,14 +6,14 @@ import { useLobbyStore } from '../store/lobbyStore';
 import type { GameType } from '../types';
 import type { ToastType } from '../App';
 
-const API = import.meta.env.VITE_API_URL ?? `http://${window.location.hostname}:8080`;
+const API = import.meta.env.VITE_API_URL ?? `http://${window.location.hostname}`;
 
 interface Props {
   toast: (msg: string, type?: ToastType) => void;
 }
 
 function QrCode({ roomCode }: { roomCode: string }) {
-  const playerBase = import.meta.env.VITE_PLAYER_URL ?? `http://${window.location.hostname}:5174`;
+  const playerBase = import.meta.env.VITE_PLAYER_URL ?? `http://${window.location.hostname}/player`;
   const url = `${playerBase}/?room=${roomCode}`;
   return (
     <div className="qr-placeholder" title={url}>
@@ -29,7 +29,7 @@ const GAME_TYPE_LABELS: Record<string, string> = {
 export default function LobbyPage({ toast }: Props) {
   const navigate = useNavigate();
   const { code } = useParams<{ code: string }>();
-  const { players, playerOrder, gameType, roomPhase, handleMessage } = useGameStore();
+  const { players, playerOrder, gameType, roomPhase, board, handleMessage } = useGameStore();
   const { setActiveRoom } = useLobbyStore();
 
   const [copied, setCopied] = useState(false);
@@ -69,7 +69,21 @@ export default function LobbyPage({ toast }: Props) {
 
   function copyCode() {
     if (!code) return;
-    navigator.clipboard.writeText(code);
+    const write = () => {
+      try {
+        navigator.clipboard.writeText(code);
+      } catch {
+        const el = document.createElement('textarea');
+        el.value = code;
+        el.style.position = 'fixed';
+        el.style.opacity = '0';
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+      }
+    };
+    write();
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
     toast('Room-Code kopiert!', 'success');
@@ -259,10 +273,10 @@ export default function LobbyPage({ toast }: Props) {
         <button
           className="btn-success btn-lg"
           onClick={startGame}
-          disabled={connectedPlayers.length === 0 || starting || !isLobbyPhase}
+          disabled={connectedPlayers.length === 0 || starting || !isLobbyPhase || board.length === 0}
           style={{ width: '100%', boxShadow: '0 4px 20px rgba(22,163,74,0.3)' }}
         >
-          {starting ? 'Starte…' : `Spiel starten (${connectedPlayers.length} Spieler)`}
+          {starting ? 'Starte…' : board.length === 0 ? 'Kein Quiz geladen' : `Spiel starten (${connectedPlayers.length} Spieler)`}
         </button>
       </div>
     </div>

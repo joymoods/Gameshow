@@ -1,21 +1,22 @@
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useGameStore } from '../store/gameStore';
 
 export default function WaitingPage() {
   const navigate = useNavigate();
-  const { myPlayerName, roomCode, players, roomPhase } = useGameStore();
+  const { myPlayerName, myPlayerId, roomCode, players, roomPhase, roomReset, clearRoomReset } = useGameStore();
 
   useEffect(() => {
+    if (roomReset) { clearRoomReset(); navigate('/'); return; }
     if (!roomPhase) return;
     if (roomPhase === 'IN_PROGRESS') navigate('/game');
     else if (roomPhase === 'GAME_OVER') navigate('/end');
-  }, [roomPhase, navigate]);
+  }, [roomPhase, roomReset, navigate, clearRoomReset]);
 
-  if (!roomCode) {
+  if (!roomCode && !myPlayerName) {
     return (
       <div style={{ padding: 24 }}>
-        <p>Kein aktiver Room. <a href="/" style={{ color: 'var(--primary)' }}>Zurück</a></p>
+        <p>Kein aktiver Room. <Link to="/" style={{ color: 'var(--primary)' }}>Zurück</Link></p>
       </div>
     );
   }
@@ -47,7 +48,7 @@ export default function WaitingPage() {
         </div>
         <div className="waiting-player-list">
           {players.map((p) => {
-            const isMe = p.id === useGameStore.getState().myPlayerId;
+            const isMe = p.id === myPlayerId;
             return (
               <div key={p.id} className={`waiting-player-item ${isMe ? 'is-me' : ''}`}>
                 <div className={`waiting-player-avatar ${isMe ? 'is-me' : 'other'}`}>

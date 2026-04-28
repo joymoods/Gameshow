@@ -15,6 +15,7 @@ interface ActiveQuestion {
   category: string;
   points: number;
   text: string;
+  answer?: string;
   imageUrl?: string;
   audioUrl?: string;
   videoUrl?: string;
@@ -123,7 +124,7 @@ export const useGameStore = create<GameState>((set) => ({
           for (const cat of board) {
             if (cat.questions.some((q) => q.id === cq.id)) { catName = cat.name; break; }
           }
-          currentQuestion = { questionId: cq.id, category: catName, points: cq.points, text: cq.text, imageUrl: cq.imageUrl, audioUrl: cq.audioUrl, videoUrl: cq.videoUrl };
+          currentQuestion = { questionId: cq.id, category: catName, points: cq.points, text: cq.text, answer: cq.answer, imageUrl: cq.imageUrl, audioUrl: cq.audioUrl, videoUrl: cq.videoUrl };
         }
 
         set({

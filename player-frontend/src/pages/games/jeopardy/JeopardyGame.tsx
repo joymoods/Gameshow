@@ -3,7 +3,7 @@ import { useGameStore } from '../../../store/gameStore';
 import { buzz } from '../../../ws/socket';
 import { playBuzz, playCorrect, playWrong } from '../../../audio';
 
-const BACKEND = import.meta.env.VITE_API_URL ?? `http://${window.location.hostname}:8080`;
+const BACKEND = import.meta.env.VITE_API_URL ?? `http://${window.location.hostname}`;
 
 function mediaUrl(url?: string): string | undefined {
   if (!url) return undefined;
@@ -151,7 +151,7 @@ export default function JeopardyGame() {
 
   const showBuzzerSection = (overlayPhase === 'buzzer' || overlayPhase === 'buzzed-me' || overlayPhase === 'buzzed-other') && phase !== 'QUESTION_DONE';
 
-  const numRows = board[0]?.questions.length ?? 5;
+  const numRows = board.length > 0 ? Math.max(...board.map((c) => c.questions.length)) : 5;
 
   return (
     <div className="game-page">
