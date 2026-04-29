@@ -213,7 +213,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
       case MSG.GAME_OVER: {
         const p = msg.payload as { finalScores: Player[] };
-        set({ phase: 'GAME_OVER', finalScores: p.finalScores, buzzerOpen: false });
+        set({ phase: 'GAME_OVER', roomPhase: 'GAME_OVER', finalScores: p.finalScores, buzzerOpen: false });
         break;
       }
 
