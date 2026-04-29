@@ -209,12 +209,18 @@ export default function LobbyPage({ toast }: Props) {
               <span className="game-type-hint">Wechsel nur in der Lobby möglich.</span>
             )}
           </div>
-          <div style={{ marginTop: 8 }}>
+          <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
             <button
               className="btn-secondary btn-sm"
               onClick={() => navigate('/builder/jeopardy')}
             >
               Quiz-Builder öffnen
+            </button>
+            <button
+              className="btn-secondary btn-sm"
+              onClick={() => navigate('/library')}
+            >
+              Bibliothek
             </button>
           </div>
         </div>

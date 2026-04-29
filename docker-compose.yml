@@ -1,12 +1,46 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: brainstorm
+      POSTGRES_USER: brainstorm
+      POSTGRES_PASSWORD: brainstorm
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/db/migrations/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U brainstorm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   backend:
     build: ./backend
     restart: unless-stopped
     environment:
       PORT: "8080"
       UPLOAD_DIR: /data/uploads
+      DATABASE_URL: "postgres://brainstorm:brainstorm@postgres:5432/brainstorm"
+      REDIS_URL: "redis://redis:6379"
     volumes:
       - ./data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   caddy:
     image: caddy:2-alpine
@@ -24,3 +58,5 @@ services:
 
 volumes:
   caddy_data:
+  postgres_data:
+  redis_data:

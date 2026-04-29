@@ -7,21 +7,25 @@ import (
 
 	"games/game/core"
 	"games/game/jeopardy"
+	"games/library"
 	"games/ws"
 )
 
 type Router struct {
 	manager   *core.Manager
 	wsHandler *ws.Handler
+	quizStore *library.QuizStore
 }
 
-func NewRouter(manager *core.Manager, wsHandler *ws.Handler) *Router {
-	return &Router{manager: manager, wsHandler: wsHandler}
+func NewRouter(manager *core.Manager, wsHandler *ws.Handler, quizStore *library.QuizStore) *Router {
+	return &Router{manager: manager, wsHandler: wsHandler, quizStore: quizStore}
 }
 
 func (ro *Router) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/rooms", ro.withCORS(ro.handleRooms))
 	mux.HandleFunc("/api/rooms/", ro.withCORS(ro.handleRoomRoutes))
+	mux.HandleFunc("/api/library", ro.withCORS(ro.handleLibraryCollection))
+	mux.HandleFunc("/api/library/", ro.withCORS(ro.handleLibraryRoutes))
 }
 
 func (ro *Router) withCORS(next http.HandlerFunc) http.HandlerFunc {
@@ -123,10 +127,13 @@ func (ro *Router) handleRoomRoutes(w http.ResponseWriter, r *http.Request) {
 
 	switch sub {
 	case "quiz":
-		if r.Method == http.MethodPost {
-			ro.handleUploadQuiz(w, r, room)
-		} else {
+		if r.Method != http.MethodPost {
 			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		} else if strings.HasPrefix(rest, "library/") {
+			quizID := strings.TrimPrefix(rest, "library/")
+			ro.handleLoadFromLibrary(w, r, room, quizID)
+		} else {
+			ro.handleUploadQuiz(w, r, room)
 		}
 
 	case "export":

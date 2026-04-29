@@ -84,6 +84,9 @@ export default function HomePage({ toast }: Props) {
           <button className="btn-secondary btn-sm" onClick={() => navigate('/builder/jeopardy')}>
             Quiz-Builder
           </button>
+          <button className="btn-secondary btn-sm" onClick={() => navigate('/library')}>
+            Bibliothek
+          </button>
           <button className="btn-primary" onClick={() => setShowModal(true)}>
             + Neue Lobby
           </button>

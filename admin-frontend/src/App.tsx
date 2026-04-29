@@ -5,6 +5,7 @@ import BuilderPage from './pages/games/jeopardy/BuilderPage';
 import LobbyPage from './pages/LobbyPage';
 import ControlPage from './pages/ControlPage';
 import HomePage from './pages/HomePage';
+import LibraryPage from './pages/LibraryPage';
 import PinPage from './pages/PinPage';
 import { useGameStore } from './store/gameStore';
 import { useLobbyStore } from './store/lobbyStore';
@@ -47,6 +48,7 @@ function Toasts({ toasts }: { toasts: Toast[] }) {
 const PAGE_TITLES: Record<string, string> = {
   '/': 'Lobbys',
   '/builder/jeopardy': 'Quiz-Builder',
+  '/library': 'Quiz-Bibliothek',
 };
 
 function Nav({ onEndGame }: { onEndGame?: () => void }) {
@@ -135,6 +137,15 @@ function AppShell() {
             <>
               <Nav />
               <BuilderPage toast={toast} />
+            </>
+          }
+        />
+        <Route
+          path="/library"
+          element={
+            <>
+              <Nav />
+              <LibraryPage toast={toast} />
             </>
           }
         />

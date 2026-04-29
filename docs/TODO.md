@@ -67,7 +67,7 @@
 
 ### Backend
 - [x] Room-Cleanup: abgeschlossene oder leere Rooms nach Timeout entfernen
-- [ ] Persist-Option: Quiz-Daten in JSON-Datei speichern (optional, für Wiederverwendung)
+- [x] Persist-Option: PostgreSQL-Datenbank + Redis-Cache eingeführt; Quiz-Bibliothek implementiert (GET/POST/PUT/DELETE /api/library)
 - [ ] Zweiter Spieltyp implementieren (z.B. Quiz mit Multiple-Choice) als Proof-of-Concept
 
 ### Admin-Frontend

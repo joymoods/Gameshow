@@ -19,7 +19,7 @@ func newTestServer(t *testing.T) (*httptest.Server, *core.Manager) {
 	manager := core.NewManager()
 	hub := ws.NewHub()
 	wsHandler := ws.NewHandler(hub, manager)
-	router := api.NewRouter(manager, wsHandler)
+	router := api.NewRouter(manager, wsHandler, nil)
 	mux := http.NewServeMux()
 	router.Register(mux)
 	srv := httptest.NewServer(mux)
