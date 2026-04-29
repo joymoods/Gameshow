@@ -1,10 +1,12 @@
-import { useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import { useGameStore } from '../../../store/gameStore';
 import { useLobbyStore } from '../../../store/lobbyStore';
+import { getQuiz, updateQuiz } from '../../../api/library';
 import type { Category, Question } from '../../../types';
 import type { ToastType } from '../../../App';
+import BoardPreview from '../../../components/BoardPreview';
 
 const API = import.meta.env.VITE_API_URL ?? `http://${window.location.hostname}`;
 
@@ -14,60 +16,6 @@ function emptyQuestion(categoryId: string): Question {
 
 function emptyCategory(): Category {
   return { id: uuidv4(), name: 'Neue Kategorie', questions: [] };
-}
-
-// ---- Board Preview ----
-
-function BoardPreview({ categories }: { categories: Category[] }) {
-  if (!categories.length) {
-    return (
-      <div className="board-preview-inner">
-        <div className="board-preview-empty">
-          <div className="board-preview-empty-icon">⊞</div>
-          <div>Board-Vorschau</div>
-          <div style={{ fontSize: 11, opacity: 0.6 }}>Füge Kategorien hinzu</div>
-        </div>
-      </div>
-    );
-  }
-
-  const maxQ = Math.max(...categories.map((c) => c.questions.length), 1);
-
-  return (
-    <div className="board-preview-inner">
-      <div className="board-preview-label">BOARD-VORSCHAU</div>
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: `repeat(${categories.length}, 1fr)`,
-          gridTemplateRows: `auto repeat(${maxQ}, 1fr)`,
-          gap: 4,
-        }}
-      >
-        {categories.map((cat) => (
-          <div key={cat.id + 'h'} className="preview-cat-header">
-            {cat.name || '—'}
-          </div>
-        ))}
-        {Array.from({ length: maxQ }).map((_, ri) =>
-          categories.map((cat) => {
-            const q = cat.questions[ri];
-            return q ? (
-              <div key={q.id} className="preview-cell">
-                {q.points}
-              </div>
-            ) : (
-              <div key={`e-${cat.id}-${ri}`} className="preview-cell-empty" />
-            );
-          })
-        )}
-      </div>
-      <div className="board-preview-stats">
-        <span>{categories.length} Kategorien</span>
-        <span>{categories.reduce((a, c) => a + c.questions.length, 0)} Fragen</span>
-      </div>
-    </div>
-  );
 }
 
 // ---- Question Editor ----
@@ -173,10 +121,28 @@ interface QuestionDrag {
 
 export default function BuilderPage({ toast }: Props) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { builderCategories, setBuilderCategories } = useGameStore();
   const { activeRoomCode } = useLobbyStore();
   const importRef = useRef<HTMLInputElement>(null);
   const [questionDrag, setQuestionDrag] = useState<QuestionDrag | null>(null);
+  const [editingQuizId, setEditingQuizId] = useState<string | null>(null);
+  const [editingQuizName, setEditingQuizName] = useState('');
+  const [editingQuizDesc, setEditingQuizDesc] = useState('');
+  const [savingToLibrary, setSavingToLibrary] = useState(false);
+
+  useEffect(() => {
+    const quizId = searchParams.get('quizId');
+    if (!quizId) return;
+    getQuiz(quizId)
+      .then((detail) => {
+        setBuilderCategories(detail.categories as unknown as Category[]);
+        setEditingQuizId(detail.id);
+        setEditingQuizName(detail.name);
+        setEditingQuizDesc(detail.description ?? '');
+      })
+      .catch((e) => toast(String(e), 'error'));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function addCategory() {
     setBuilderCategories([...builderCategories, emptyCategory()]);
@@ -297,6 +263,19 @@ export default function BuilderPage({ toast }: Props) {
     }
   }
 
+  async function saveToLibrary() {
+    if (!editingQuizId) return;
+    setSavingToLibrary(true);
+    try {
+      await updateQuiz(editingQuizId, editingQuizName, editingQuizDesc, builderCategories);
+      toast('In Bibliothek gespeichert', 'success');
+    } catch (e) {
+      toast(String(e), 'error');
+    } finally {
+      setSavingToLibrary(false);
+    }
+  }
+
   const canUpload = !!activeRoomCode && builderCategories.length > 0;
 
   return (
@@ -304,23 +283,48 @@ export default function BuilderPage({ toast }: Props) {
       {/* Left: editor */}
       <div className="builder-editor">
         <div className="builder-header">
-          <h1>Quiz-Builder</h1>
+          <h1>
+            {editingQuizId ? (
+              <input
+                className="category-name-input"
+                style={{ fontSize: 18, fontWeight: 700, flex: 1 }}
+                value={editingQuizName}
+                onChange={(e) => setEditingQuizName(e.target.value)}
+                placeholder="Quiz-Name"
+              />
+            ) : 'Quiz-Builder'}
+          </h1>
           <div className="header-actions">
-            <button className="btn-secondary btn-sm" onClick={() => importRef.current?.click()}>
-              📂 Import
+            <button className="btn-secondary btn-sm" onClick={() => navigate('/library')}>
+              ← Bibliothek
             </button>
-            <input ref={importRef} type="file" accept=".json" style={{ display: 'none' }} onChange={importQuiz} />
-            <button className="btn-secondary btn-sm" onClick={exportQuiz} disabled={builderCategories.length === 0}>
-              💾 Export
-            </button>
-            <button className="btn-secondary" onClick={addCategory}>+ Kategorie</button>
+            <button className="btn-secondary btn-sm" onClick={addCategory}>+ Kategorie</button>
+            {editingQuizId ? (
+              <button
+                className="btn-primary"
+                onClick={saveToLibrary}
+                disabled={savingToLibrary || builderCategories.length === 0}
+              >
+                {savingToLibrary ? 'Speichert…' : '💾 In Bibliothek speichern'}
+              </button>
+            ) : (
+              <>
+                <button className="btn-secondary btn-sm" onClick={() => importRef.current?.click()}>
+                  📂 Import
+                </button>
+                <input ref={importRef} type="file" accept=".json" style={{ display: 'none' }} onChange={importQuiz} />
+                <button className="btn-secondary btn-sm" onClick={exportQuiz} disabled={builderCategories.length === 0}>
+                  💾 Export
+                </button>
+              </>
+            )}
             <button
               className="btn-primary"
               onClick={uploadQuiz}
               disabled={!canUpload}
               title={!activeRoomCode ? 'Keine aktive Lobby' : ''}
             >
-              Quiz hochladen
+              In Raum laden
             </button>
             {activeRoomCode && (
               <button

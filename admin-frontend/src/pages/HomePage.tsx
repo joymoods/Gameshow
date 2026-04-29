@@ -25,10 +25,14 @@ interface Props {
   toast: (msg: string, type?: ToastType) => void;
 }
 
+const PAGE_SIZE = 5;
+
 export default function HomePage({ toast }: Props) {
   const navigate = useNavigate();
   const { rooms, fetchRooms, setActiveRoom } = useLobbyStore();
   const [creating, setCreating] = useState<GameType | null>(null);
+  const [page, setPage] = useState(0);
+  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     fetchRooms();
@@ -77,9 +81,11 @@ export default function HomePage({ toast }: Props) {
   }
 
   const activeRooms = rooms.filter((r) => r.room_phase !== 'GAME_OVER');
+  const totalPages = Math.max(1, Math.ceil(activeRooms.length / PAGE_SIZE));
+  const visibleRooms = activeRooms.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   return (
-    <div className="home-page">
+    <div className="home-layout">
       <div className="game-select-section">
         <div className="game-select-header">
           <h1 className="game-select-title">Spiel auswählen</h1>
@@ -103,45 +109,61 @@ export default function HomePage({ toast }: Props) {
             </button>
           ))}
         </div>
-
-        <div className="game-select-tools">
-          <button className="btn-ghost btn-sm" onClick={() => navigate('/builder/jeopardy')}>
-            Quiz-Builder
-          </button>
-          <button className="btn-ghost btn-sm" onClick={() => navigate('/library')}>
-            Bibliothek
-          </button>
-        </div>
       </div>
 
-      {activeRooms.length > 0 && (
-        <div className="active-rooms-section">
-          <div className="active-rooms-header">
-            <span className="active-rooms-label">AKTIVE SESSIONS</span>
-            <span className="active-rooms-count">{activeRooms.length}</span>
-          </div>
-          <div className="active-rooms-list">
-            {activeRooms.map((room) => (
-              <div key={room.roomCode} className="active-room-row">
-                <button className="active-room-btn" onClick={() => openRoom(room)}>
-                  <span className="active-room-code">{room.roomCode}</span>
-                  <span className={`active-room-phase phase-${String(room.room_phase).toLowerCase()}`}>
-                    {PHASE_LABELS[room.room_phase as string] ?? room.room_phase}
-                  </span>
-                  <span className="active-room-players">{(room.scores?.length ?? 0)} Spieler</span>
-                </button>
-                <button
-                  className="active-room-close"
-                  onClick={(e) => closeRoom(e, room.roomCode)}
-                  title="Raum schließen"
-                >
-                  ✕
-                </button>
+      <div className="active-rooms-panel">
+        <button className="active-rooms-panel-header" onClick={() => setCollapsed((c) => !c)}>
+          <span className="active-rooms-label">AKTIVE SESSIONS</span>
+          <span className="active-rooms-count">{activeRooms.length}</span>
+          <span className="active-rooms-panel-toggle">{collapsed ? '▲' : '▼'}</span>
+        </button>
+
+        {!collapsed && (
+          <div className="active-rooms-panel-body">
+            {activeRooms.length === 0 ? (
+              <p className="active-rooms-empty">Keine aktiven Sessions.</p>
+            ) : (
+              <div className="active-rooms-list">
+                {visibleRooms.map((room) => (
+                  <div key={room.roomCode} className="active-room-row">
+                    <button className="active-room-btn" onClick={() => openRoom(room)}>
+                      <span className="active-room-code">{room.roomCode}</span>
+                      <span className={`active-room-phase phase-${String(room.room_phase).toLowerCase()}`}>
+                        {PHASE_LABELS[room.room_phase as string] ?? room.room_phase}
+                      </span>
+                      <span className="active-room-players">{(room.scores?.length ?? 0)} Spieler</span>
+                    </button>
+                    <button
+                      className="active-room-close"
+                      onClick={(e) => closeRoom(e, room.roomCode)}
+                      title="Raum schließen"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
+            <div className="active-rooms-pagination">
+              <button
+                className="btn-secondary btn-sm"
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={page === 0}
+              >
+                ←
+              </button>
+              <span className="active-rooms-page-info">{page + 1} / {totalPages}</span>
+              <button
+                className="btn-secondary btn-sm"
+                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                disabled={page >= totalPages - 1}
+              >
+                →
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

@@ -18,8 +18,18 @@ export const useLobbyStore = create<LobbyState>((set) => ({
     try {
       const res = await fetch(`${API}/api/rooms`);
       if (res.ok) {
-        const data: RoomInfo[] = await res.json();
-        set({ rooms: data ?? [] });
+        const data: RoomInfo[] = await res.json() ?? [];
+        set((state) => {
+          const dataMap = new Map(data.map((r) => [r.roomCode, r]));
+          // Keep existing rooms in order (updated data), remove gone ones
+          const existing = state.rooms
+            .filter((r) => dataMap.has(r.roomCode))
+            .map((r) => dataMap.get(r.roomCode)!);
+          // New rooms go to the front (newest on top)
+          const existingCodes = new Set(state.rooms.map((r) => r.roomCode));
+          const added = data.filter((r) => !existingCodes.has(r.roomCode));
+          return { rooms: [...added, ...existing] };
+        });
       }
     } catch {
       // network error – silently ignore, rooms stays stale

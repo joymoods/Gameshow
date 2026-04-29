@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { QRCodeSVG } from 'qrcode.react';
 import { useGameStore } from '../store/gameStore';
 import { useLobbyStore } from '../store/lobbyStore';
-import type { GameType } from '../types';
 import type { ToastType } from '../App';
+import BoardPreview from '../components/BoardPreview';
 
 const API = import.meta.env.VITE_API_URL ?? `http://${window.location.hostname}`;
 
@@ -12,33 +11,16 @@ interface Props {
   toast: (msg: string, type?: ToastType) => void;
 }
 
-function QrCode({ roomCode }: { roomCode: string }) {
-  const playerBase = import.meta.env.VITE_PLAYER_URL ?? `http://${window.location.hostname}/player`;
-  const url = `${playerBase}/?room=${roomCode}`;
-  return (
-    <div className="qr-placeholder" title={url}>
-      <QRCodeSVG value={url} size={110} fgColor="#4f6ef7" bgColor="transparent" />
-    </div>
-  );
-}
-
-const GAME_TYPE_LABELS: Record<string, string> = {
-  jeopardy: 'Jeopardy',
-};
-
 export default function LobbyPage({ toast }: Props) {
   const navigate = useNavigate();
   const { code } = useParams<{ code: string }>();
-  const { players, playerOrder, gameType, roomPhase, board, handleMessage } = useGameStore();
+  const { players, playerOrder, roomPhase, board, handleMessage } = useGameStore();
   const { setActiveRoom } = useLobbyStore();
 
   const [copied, setCopied] = useState(false);
   const [starting, setStarting] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
-  const [pendingGameType, setPendingGameType] = useState<GameType>('jeopardy');
-  const [switching, setSwitching] = useState(false);
 
-  // Register active room in lobby store and load initial state
   useEffect(() => {
     if (!code) return;
     setActiveRoom(code);
@@ -52,15 +34,9 @@ export default function LobbyPage({ toast }: Props) {
       }
       const snap = await res.json();
       handleMessage({ type: 'GAME_STATE', payload: snap });
-      setPendingGameType((snap.game_type as GameType) ?? 'jeopardy');
     }
     loadRoom();
   }, [code]);  // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Keep pendingGameType in sync when gameType changes via WS
-  useEffect(() => {
-    if (gameType) setPendingGameType(gameType);
-  }, [gameType]);
 
   const connectedPlayers = players.filter((p) => p.connected);
   const orderedPlayers = playerOrder
@@ -69,21 +45,18 @@ export default function LobbyPage({ toast }: Props) {
 
   function copyCode() {
     if (!code) return;
-    const write = () => {
-      try {
-        navigator.clipboard.writeText(code);
-      } catch {
-        const el = document.createElement('textarea');
-        el.value = code;
-        el.style.position = 'fixed';
-        el.style.opacity = '0';
-        document.body.appendChild(el);
-        el.select();
-        document.execCommand('copy');
-        document.body.removeChild(el);
-      }
-    };
-    write();
+    try {
+      navigator.clipboard.writeText(code);
+    } catch {
+      const el = document.createElement('textarea');
+      el.value = code;
+      el.style.position = 'fixed';
+      el.style.opacity = '0';
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
     toast('Room-Code kopiert!', 'success');
@@ -91,6 +64,19 @@ export default function LobbyPage({ toast }: Props) {
 
   async function shuffle() {
     await fetch(`${API}/api/rooms/${code}/players/shuffle`, { method: 'POST' });
+  }
+
+  async function kickPlayer(playerId: string, playerName: string) {
+    if (!confirm(`"${playerName}" wirklich kicken?`)) return;
+    try {
+      const res = await fetch(`${API}/api/rooms/${code}/players/${playerId}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json();
+        toast(data.error || 'Kick fehlgeschlagen', 'error');
+      }
+    } catch (e) {
+      toast(String(e), 'error');
+    }
   }
 
   function onDragStart(index: number) {
@@ -114,27 +100,6 @@ export default function LobbyPage({ toast }: Props) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(playerOrder),
     });
-  }
-
-  async function switchGame() {
-    setSwitching(true);
-    try {
-      const res = await fetch(`${API}/api/rooms/${code}/game`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ game_type: pendingGameType }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        toast(data.error || 'Spiel-Wechsel fehlgeschlagen', 'error');
-        return;
-      }
-      toast(`Spiel gewechselt zu: ${GAME_TYPE_LABELS[pendingGameType] ?? pendingGameType}`, 'success');
-    } catch (e) {
-      toast(String(e), 'error');
-    } finally {
-      setSwitching(false);
-    }
   }
 
   async function startGame() {
@@ -166,63 +131,32 @@ export default function LobbyPage({ toast }: Props) {
   return (
     <div className="lobby-scroll">
       <div className="lobby-inner">
-        {/* Room code + QR */}
-        <div className="room-code-card">
-          <div className="room-code-info">
-            <div className="room-code-section-label">ROOM-CODE</div>
-            <div className="room-code-value">{code}</div>
-            <div className="room-code-hint">Teile diesen Code mit deinen Spielern.</div>
-            <button
-              className={copied ? 'btn-success btn-sm' : 'btn-secondary btn-sm'}
-              onClick={copyCode}
-            >
-              {copied ? '✓ Kopiert' : 'Code kopieren'}
-            </button>
-          </div>
-          <QrCode roomCode={code} />
+
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <button className="btn-secondary btn-sm" onClick={() => navigate('/')}>
+            ← Zurück
+          </button>
+          <button
+            className={copied ? 'btn-success btn-sm' : 'btn-secondary btn-sm'}
+            onClick={copyCode}
+          >
+            {copied ? '✓ Code kopiert' : 'Code kopieren'}
+          </button>
         </div>
 
-        {/* Game type */}
+        {/* Quiz */}
         <div className="lobby-players-card">
           <div className="lobby-section-header">
-            <h2>Spiel-Typ</h2>
-          </div>
-          <div className="game-type-row">
-            <select
-              className="form-select"
-              value={pendingGameType}
-              onChange={(e) => setPendingGameType(e.target.value as GameType)}
-              disabled={!isLobbyPhase}
-              title={!isLobbyPhase ? 'Spiel läuft bereits' : ''}
-            >
-              <option value="jeopardy">Jeopardy</option>
-            </select>
-            <button
-              className="btn-primary btn-sm"
-              onClick={switchGame}
-              disabled={!isLobbyPhase || pendingGameType === gameType || switching}
-              title={!isLobbyPhase ? 'Spiel läuft bereits' : ''}
-            >
-              {switching ? 'Wechsle…' : 'Übernehmen'}
-            </button>
-            {!isLobbyPhase && (
-              <span className="game-type-hint">Wechsel nur in der Lobby möglich.</span>
-            )}
-          </div>
-          <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
-            <button
-              className="btn-secondary btn-sm"
-              onClick={() => navigate('/builder/jeopardy')}
-            >
-              Quiz-Builder öffnen
-            </button>
+            <h2>Quiz</h2>
             <button
               className="btn-secondary btn-sm"
               onClick={() => navigate('/library')}
             >
-              Bibliothek
+              Quiz-Bibliothek
             </button>
           </div>
+          <BoardPreview categories={board} />
         </div>
 
         {/* Players */}
@@ -231,15 +165,13 @@ export default function LobbyPage({ toast }: Props) {
             <h2>
               Spieler <span className="lobby-player-count">({connectedPlayers.length})</span>
             </h2>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                className="btn-secondary btn-sm"
-                onClick={shuffle}
-                disabled={orderedPlayers.length < 2}
-              >
-                🎲 Zufällig
-              </button>
-            </div>
+            <button
+              className="btn-secondary btn-sm"
+              onClick={shuffle}
+              disabled={orderedPlayers.length < 2}
+            >
+              🎲 Zufällig
+            </button>
           </div>
 
           {orderedPlayers.length === 0 ? (
@@ -269,6 +201,14 @@ export default function LobbyPage({ toast }: Props) {
                   ) : (
                     <span className="player-offline-badge">offline</span>
                   )}
+                  <button
+                    className="active-room-close"
+                    style={{ marginLeft: 'auto' }}
+                    onClick={() => kickPlayer(player.id, player.name)}
+                    title="Spieler kicken"
+                  >
+                    ✕
+                  </button>
                 </div>
               ))}
             </div>

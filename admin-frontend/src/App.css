@@ -819,8 +819,20 @@ input:focus, textarea:focus, select:focus { border-color: var(--primary); }
   gap: 40px;
 }
 
+/* HomePage-specific layout (game select + sticky sessions panel) */
+.home-layout {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
 /* Game selection */
 .game-select-section {
+  flex: 1;
+  overflow-y: auto;
+  padding: 48px 40px 32px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -886,17 +898,27 @@ input:focus, textarea:focus, select:focus { border-color: var(--primary); }
   gap: 10px;
 }
 
-/* Active rooms */
-.active-rooms-section {
+/* Active rooms panel */
+.active-rooms-panel {
+  flex-shrink: 0;
   border-top: 1px solid var(--border);
-  padding-top: 24px;
+  background: var(--surface);
 }
-.active-rooms-header {
+.active-rooms-panel-header {
+  width: 100%;
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 12px;
+  padding: 10px 24px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
 }
+.active-rooms-panel-header:hover { background: var(--surface2); }
+.active-rooms-panel-toggle { margin-left: auto; font-size: 10px; color: var(--text-muted); }
+.active-rooms-panel-body { padding: 0 24px 12px; height: 280px; overflow: hidden; display: flex; flex-direction: column; }
+.active-rooms-empty { font-size: 13px; color: var(--text-muted); padding: 6px 0 8px; }
 .active-rooms-label {
   font-size: 10px;
   font-weight: 700;
@@ -912,7 +934,14 @@ input:focus, textarea:focus, select:focus { border-color: var(--primary); }
   padding: 1px 8px;
   color: var(--text-muted);
 }
-.active-rooms-list { display: flex; flex-direction: column; gap: 6px; }
+.active-rooms-list { flex: 1; display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; overflow: hidden; }
+.active-rooms-pagination {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: auto;
+}
+.active-rooms-page-info { font-size: 12px; color: var(--text-muted); }
 
 .active-room-row {
   display: flex;
@@ -960,10 +989,8 @@ input:focus, textarea:focus, select:focus { border-color: var(--primary); }
   justify-content: center;
   cursor: pointer;
   flex-shrink: 0;
-  opacity: 0;
-  transition: opacity 0.15s, background 0.15s;
+  transition: background 0.15s;
 }
-.active-room-row:hover .active-room-close { opacity: 1; }
 .active-room-close:hover { background: rgba(239,68,68,0.25); }
 
 /* ---- Modal ---- */
@@ -1100,6 +1127,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--primary); }
 }
 .library-table tr:last-child td { border-bottom: none; }
 .library-table tr:hover td { background: var(--surface2); }
+.library-table td:last-child, .library-table th:last-child { text-align: right; }
 .library-quiz-name { font-weight: 600; color: var(--text); }
 .library-quiz-desc { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
-.library-actions { display: flex; gap: 8px; }
+.library-actions { display: flex; gap: 8px; justify-content: flex-end; }

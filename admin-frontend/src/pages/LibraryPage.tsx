@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLobbyStore } from '../store/lobbyStore';
-import { listQuizzes, deleteQuiz, loadQuizFromLibrary, saveRoomQuizToLibrary } from '../api/library';
+import { listQuizzes, deleteQuiz, loadQuizFromLibrary, saveQuiz, getQuiz } from '../api/library';
 import type { QuizSummary } from '../types/library';
+import type { Category } from '../types';
 import type { ToastType } from '../App';
 
 interface Props {
@@ -12,27 +13,23 @@ interface Props {
 export default function LibraryPage({ toast }: Props) {
   const navigate = useNavigate();
   const activeRoomCode = useLobbyStore((s) => s.activeRoomCode);
+  const importRef = useRef<HTMLInputElement>(null);
 
   const [quizzes, setQuizzes] = useState<QuizSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [saveModal, setSaveModal] = useState(false);
-  const [saveName, setSaveName] = useState('');
-  const [saveDesc, setSaveDesc] = useState('');
-  const [saving, setSaving] = useState(false);
+  const [importModal, setImportModal] = useState(false);
+  const [importName, setImportName] = useState('');
+  const [importDesc, setImportDesc] = useState('');
+  const [importCategories, setImportCategories] = useState<Category[] | null>(null);
+  const [importing, setImporting] = useState(false);
 
-  async function fetchQuizzes() {
-    try {
-      const list = await listQuizzes();
-      setQuizzes(list);
-    } catch (e) {
-      toast(String(e), 'error');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => { fetchQuizzes(); }, []);
+  useEffect(() => {
+    listQuizzes()
+      .then(setQuizzes)
+      .catch((e) => toast(String(e), 'error'))
+      .finally(() => setLoading(false));
+  }, []);
 
   async function handleLoad(quiz: QuizSummary) {
     if (!activeRoomCode) {
@@ -41,7 +38,7 @@ export default function LibraryPage({ toast }: Props) {
     }
     try {
       await loadQuizFromLibrary(activeRoomCode, quiz.id);
-      toast(`"${quiz.name}" in Raum ${activeRoomCode} geladen`, 'success');
+      navigate(`/rooms/${activeRoomCode}/lobby`);
     } catch (e) {
       toast(String(e), 'error');
     }
@@ -58,62 +55,85 @@ export default function LibraryPage({ toast }: Props) {
     }
   }
 
-  async function handleSave() {
-    if (!saveName.trim()) return;
-    if (!activeRoomCode) {
-      toast('Kein aktiver Raum – bitte zuerst eine Lobby öffnen', 'warning');
-      return;
-    }
-    setSaving(true);
+  function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const cats = JSON.parse(reader.result as string) as Category[];
+        if (!Array.isArray(cats)) throw new Error('not an array');
+        setImportCategories(cats);
+        setImportName(file.name.replace(/\.json$/i, ''));
+        setImportDesc('');
+        setImportModal(true);
+      } catch {
+        toast('Ungültige JSON-Datei', 'error');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  }
+
+  async function handleImportSave() {
+    if (!importName.trim() || !importCategories) return;
+    setImporting(true);
     try {
-      const summary = await saveRoomQuizToLibrary(activeRoomCode, saveName.trim(), saveDesc.trim());
+      const summary = await saveQuiz(importName.trim(), importDesc.trim(), 'jeopardy', importCategories);
       setQuizzes((prev) => [summary, ...prev]);
-      toast(`"${summary.name}" gespeichert`, 'success');
-      setSaveModal(false);
-      setSaveName('');
-      setSaveDesc('');
+      toast(`"${summary.name}" importiert`, 'success');
+      setImportModal(false);
+      setImportCategories(null);
     } catch (e) {
       toast(String(e), 'error');
     } finally {
-      setSaving(false);
+      setImporting(false);
     }
   }
 
-  function formatDate(iso: string) {
-    return new Date(iso).toLocaleDateString('de-DE', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-    });
+  async function handleExport(quiz: QuizSummary) {
+    try {
+      const detail = await getQuiz(quiz.id);
+      const blob = new Blob([JSON.stringify(detail.categories, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${quiz.name.replace(/\s+/g, '_')}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      toast(String(e), 'error');
+    }
   }
 
   return (
-    <div className="home-page">
-      <div className="home-header">
-        <div>
-          <h1 className="home-title">Quiz-Bibliothek</h1>
-          <p className="home-subtitle">Gespeicherte Quizzes laden oder aus einem aktiven Raum sichern.</p>
-        </div>
-        <div className="home-header-actions">
-          <button className="btn-secondary btn-sm" onClick={() => navigate(-1)}>
-            ← Zurück
+    <div className="home-page" style={{ gap: 0 }}>
+      {/* Toolbar */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+        <button className="btn-secondary btn-sm" onClick={() => navigate('/')}>
+          ← Zurück
+        </button>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <input ref={importRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleImportFile} />
+          <button className="btn-secondary btn-sm" onClick={() => importRef.current?.click()}>
+            📂 Importieren
           </button>
-          {activeRoomCode && (
-            <button className="btn-primary" onClick={() => setSaveModal(true)}>
-              Quiz speichern
-            </button>
-          )}
+          <button className="btn-primary btn-sm" onClick={() => navigate('/builder/jeopardy')}>
+            + Neues Quiz
+          </button>
         </div>
       </div>
 
+      {/* Content */}
       {loading ? (
         <div className="empty-state"><p>Lade…</p></div>
       ) : quizzes.length === 0 ? (
         <div className="empty-state">
           <p>Keine Quizzes gespeichert.</p>
-          {activeRoomCode && (
-            <button className="btn-primary" style={{ marginTop: 12 }} onClick={() => setSaveModal(true)}>
-              Erstes Quiz speichern
-            </button>
-          )}
+          <div style={{ display: 'flex', gap: 8, marginTop: 12, justifyContent: 'center' }}>
+            <button className="btn-primary btn-sm" onClick={() => navigate('/builder/jeopardy')}>+ Neues Quiz erstellen</button>
+            <button className="btn-secondary btn-sm" onClick={() => importRef.current?.click()}>📂 Importieren</button>
+          </div>
         </div>
       ) : (
         <div className="library-table-wrapper">
@@ -121,9 +141,7 @@ export default function LibraryPage({ toast }: Props) {
             <thead>
               <tr>
                 <th>Name</th>
-                <th>Typ</th>
                 <th>Fragen</th>
-                <th>Erstellt</th>
                 <th></th>
               </tr>
             </thead>
@@ -136,24 +154,21 @@ export default function LibraryPage({ toast }: Props) {
                       <div className="library-quiz-desc">{quiz.description}</div>
                     )}
                   </td>
-                  <td><span className="room-card-game">{quiz.game_type}</span></td>
                   <td>{quiz.question_count}</td>
-                  <td>{formatDate(quiz.created_at)}</td>
                   <td>
                     <div className="library-actions">
                       {activeRoomCode && (
-                        <button
-                          className="btn-primary btn-sm"
-                          onClick={() => handleLoad(quiz)}
-                          title={`In Raum ${activeRoomCode} laden`}
-                        >
+                        <button className="btn-primary btn-sm" onClick={() => handleLoad(quiz)} title={`In Raum ${activeRoomCode} laden`}>
                           Laden
                         </button>
                       )}
-                      <button
-                        className="btn-danger btn-sm"
-                        onClick={() => handleDelete(quiz)}
-                      >
+                      <button className="btn-secondary btn-sm" onClick={() => navigate(`/builder/jeopardy?quizId=${quiz.id}`)}>
+                        Bearbeiten
+                      </button>
+                      <button className="btn-secondary btn-sm" onClick={() => handleExport(quiz)}>
+                        Exportieren
+                      </button>
+                      <button className="btn-danger btn-sm" onClick={() => handleDelete(quiz)}>
                         Löschen
                       </button>
                     </div>
@@ -165,19 +180,20 @@ export default function LibraryPage({ toast }: Props) {
         </div>
       )}
 
-      {saveModal && (
-        <div className="modal-backdrop" onClick={() => setSaveModal(false)}>
+      {/* Modal: Importiertes Quiz benennen */}
+      {importModal && (
+        <div className="modal-backdrop" onClick={() => setImportModal(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2 className="modal-title">Quiz aus Raum {activeRoomCode} speichern</h2>
+            <h2 className="modal-title">Quiz importieren</h2>
             <div className="form-group">
               <label className="form-label">Name *</label>
               <input
                 className="form-input"
                 type="text"
-                placeholder="z.B. Geographie-Quiz 2025"
-                value={saveName}
-                onChange={(e) => setSaveName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+                placeholder="Name des Quizzes"
+                value={importName}
+                onChange={(e) => setImportName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleImportSave()}
                 autoFocus
               />
             </div>
@@ -187,20 +203,14 @@ export default function LibraryPage({ toast }: Props) {
                 className="form-input"
                 type="text"
                 placeholder="Optional"
-                value={saveDesc}
-                onChange={(e) => setSaveDesc(e.target.value)}
+                value={importDesc}
+                onChange={(e) => setImportDesc(e.target.value)}
               />
             </div>
             <div className="modal-actions">
-              <button className="btn-secondary" onClick={() => setSaveModal(false)}>
-                Abbrechen
-              </button>
-              <button
-                className="btn-primary"
-                onClick={handleSave}
-                disabled={!saveName.trim() || saving}
-              >
-                {saving ? 'Speichert…' : 'Speichern'}
+              <button className="btn-secondary" onClick={() => setImportModal(false)}>Abbrechen</button>
+              <button className="btn-primary" onClick={handleImportSave} disabled={!importName.trim() || importing}>
+                {importing ? 'Importiert…' : 'Importieren'}
               </button>
             </div>
           </div>
