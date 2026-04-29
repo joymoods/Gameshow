@@ -56,11 +56,15 @@ interface GameState {
   // Room was replaced by admin — player must rejoin
   roomReset: boolean;
 
+  // Player was kicked by admin
+  kicked: boolean;
+
   // Actions
   setConnected: (v: boolean) => void;
   setIdentity: (id: string, name: string) => void;
   handleMessage: (msg: WsMessage) => void;
   clearRoomReset: () => void;
+  clearKicked: () => void;
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -85,12 +89,14 @@ export const useGameStore = create<GameState>((set, get) => ({
   revealedAnswer: null,
   lastAnswerResult: null,
   roomReset: false,
+  kicked: false,
 
   setConnected: (connected) => set({ connected }),
 
   setIdentity: (myPlayerId, myPlayerName) => set({ myPlayerId, myPlayerName }),
 
   clearRoomReset: () => set({ roomReset: false }),
+  clearKicked: () => set({ kicked: false }),
 
   handleMessage: (msg) => {
     switch (msg.type) {
@@ -230,9 +236,21 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
 
       case MSG.ROOM_RESET: {
-        // Admin started a new session — clear state and send player back to join
         set({
           roomReset: true,
+          roomCode: '', phase: 'LOBBY', gameType: null, roomPhase: null,
+          board: [], players: [],
+          playerOrder: [], activePlayerId: null, activePlayerName: null,
+          currentQuestion: null, buzzerOpen: false, hasBuzzed: false,
+          buzzedPlayerId: null, buzzedPlayerName: null, finalScores: [],
+          myPlayerId: '', myPlayerName: '',
+        });
+        break;
+      }
+
+      case 'KICKED': {
+        set({
+          kicked: true,
           roomCode: '', phase: 'LOBBY', gameType: null, roomPhase: null,
           board: [], players: [],
           playerOrder: [], activePlayerId: null, activePlayerName: null,

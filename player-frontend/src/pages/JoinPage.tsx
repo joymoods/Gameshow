@@ -15,7 +15,7 @@ export default function JoinPage() {
     (searchParams.get('room') ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6)
   );
   const [name, setName] = useState('');
-  const [err, setErr] = useState('');
+  const [err, setErr] = useState(searchParams.get('kicked') === '1' ? 'Du wurdest vom Admin gekickt.' : '');
   const [loading, setLoading] = useState(false);
   const [gameLogo, setGameLogo] = useState<string | null>(null);
   const [logoLoading, setLogoLoading] = useState(false);

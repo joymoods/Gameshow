@@ -13,7 +13,8 @@ export default function EndPage() {
   function handleNewGame() {
     disconnect();
     useGameStore.setState({
-      roomCode: '', phase: 'LOBBY', board: [], players: [],
+      roomCode: '', phase: 'LOBBY', gameType: null, roomPhase: null,
+      board: [], players: [],
       playerOrder: [], activePlayerId: null, activePlayerName: null,
       currentQuestion: null, buzzerOpen: false, hasBuzzed: false,
       buzzedPlayerId: null, buzzedPlayerName: null, finalScores: [],
