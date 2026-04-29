@@ -813,49 +813,129 @@ input:focus, textarea:focus, select:focus { border-color: var(--primary); }
 .home-page {
   flex: 1;
   overflow-y: auto;
-  padding: 28px 32px;
-}
-.home-header {
+  padding: 48px 40px 32px;
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 24px;
-  gap: 16px;
+  flex-direction: column;
+  gap: 40px;
 }
-.home-title { font-size: 24px; font-weight: 800; margin-bottom: 4px; }
-.home-subtitle { color: var(--text-muted); font-size: 13px; }
-.home-header-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
 
-.rooms-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 12px;
+/* Game selection */
+.game-select-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
 }
-.room-card {
+.game-select-header { text-align: center; }
+.game-select-title { font-size: 28px; font-weight: 800; margin-bottom: 6px; }
+.game-select-subtitle { color: var(--text-muted); font-size: 14px; }
+
+.game-type-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 260px));
+  gap: 16px;
+  justify-content: center;
+  width: 100%;
+}
+
+.game-type-card {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 16px;
+  padding: 36px 24px 28px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  color: var(--text);
+  transition: border-color 0.15s, transform 0.15s, background 0.15s, box-shadow 0.15s;
+  position: relative;
+  overflow: hidden;
+}
+.game-type-card:hover:not(:disabled) {
+  border-color: var(--primary);
+  background: #141b30;
+  transform: translateY(-3px);
+  box-shadow: 0 8px 32px rgba(79,110,247,0.18);
+}
+.game-type-card:disabled { opacity: 0.6; cursor: not-allowed; }
+.game-type-card.loading { border-color: var(--primary); background: #141b30; }
+
+.game-type-card-icon { font-size: 44px; line-height: 1; }
+.game-type-card-logo { width: 160px; height: auto; object-fit: contain; }
+.game-type-card-label { font-size: 20px; font-weight: 800; color: var(--text); }
+.game-type-card-desc { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.game-type-card-spinner {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+.game-select-tools {
+  display: flex;
+  gap: 10px;
+}
+
+/* Active rooms */
+.active-rooms-section {
+  border-top: 1px solid var(--border);
+  padding-top: 24px;
+}
+.active-rooms-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.active-rooms-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--text-muted);
+}
+.active-rooms-count {
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 1px 8px;
+  color: var(--text-muted);
+}
+.active-rooms-list { display: flex; flex-direction: column; gap: 6px; }
+
+.active-room-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.active-room-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 16px 18px;
-  cursor: pointer;
-  text-align: left;
-  transition: border-color 0.15s, transform 0.1s;
+  border-radius: 8px;
+  padding: 10px 14px;
   color: var(--text);
-  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s;
 }
-.room-card:hover { border-color: var(--primary); transform: translateY(-1px); }
-.room-card-code { font-size: 22px; font-weight: 800; letter-spacing: 2px; margin-bottom: 8px; color: var(--text); }
-.room-card-meta { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
-.room-card-game {
-  font-size: 11px;
-  font-weight: 600;
-  background: rgba(79,110,247,0.15);
-  color: var(--primary);
-  padding: 2px 8px;
-  border-radius: 4px;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-}
-.room-card-phase {
+.active-room-btn:hover { border-color: var(--primary); }
+.active-room-code { font-weight: 700; letter-spacing: 2px; font-size: 14px; }
+.active-room-phase {
   font-size: 11px;
   font-weight: 600;
   padding: 2px 8px;
@@ -866,30 +946,25 @@ input:focus, textarea:focus, select:focus { border-color: var(--primary); }
 .phase-lobby { background: rgba(22,163,74,0.15); color: var(--success); }
 .phase-in_progress { background: rgba(240,180,41,0.15); color: var(--gold); }
 .phase-game_over { background: rgba(239,68,68,0.15); color: var(--danger); }
-.room-card-players { color: var(--text-muted); font-size: 12px; }
-.room-card-wrapper { position: relative; }
-.room-card-wrapper .room-card { width: 100%; }
-.room-card-close {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(239,68,68,0.15);
+.active-room-players { color: var(--text-muted); font-size: 12px; margin-left: auto; }
+.active-room-close {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid rgba(239,68,68,0.2);
+  background: rgba(239,68,68,0.08);
   color: var(--danger);
   font-size: 12px;
-  line-height: 1;
-  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
   opacity: 0;
   transition: opacity 0.15s, background 0.15s;
 }
-.room-card-wrapper:hover .room-card-close { opacity: 1; }
-.room-card-close:hover { background: rgba(239,68,68,0.35); }
+.active-room-row:hover .active-room-close { opacity: 1; }
+.active-room-close:hover { background: rgba(239,68,68,0.25); }
 
 /* ---- Modal ---- */
 .modal-backdrop {

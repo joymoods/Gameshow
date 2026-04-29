@@ -3,17 +3,22 @@ import { useNavigate } from 'react-router-dom';
 import { useLobbyStore } from '../store/lobbyStore';
 import type { GameType, RoomInfo } from '../types';
 import type { ToastType } from '../App';
+import brainstormLogo from '../assets/brainstorm-logo.png';
 
 const API = import.meta.env.VITE_API_URL ?? `http://${window.location.hostname}`;
+
+const GAME_TYPES: { id: GameType; logo?: string; icon?: string; description: string }[] = [
+  {
+    id: 'jeopardy',
+    logo: brainstormLogo,
+    description: 'Kategorien & Punktewerte – wer kennt die Antwort?',
+  },
+];
 
 const PHASE_LABELS: Record<string, string> = {
   LOBBY: 'Lobby',
   IN_PROGRESS: 'Läuft',
   GAME_OVER: 'Beendet',
-};
-
-const GAME_TYPE_LABELS: Record<string, string> = {
-  jeopardy: 'Jeopardy',
 };
 
 interface Props {
@@ -23,9 +28,7 @@ interface Props {
 export default function HomePage({ toast }: Props) {
   const navigate = useNavigate();
   const { rooms, fetchRooms, setActiveRoom } = useLobbyStore();
-  const [showModal, setShowModal] = useState(false);
-  const [gameType, setGameType] = useState<GameType>('jeopardy');
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState<GameType | null>(null);
 
   useEffect(() => {
     fetchRooms();
@@ -33,8 +36,9 @@ export default function HomePage({ toast }: Props) {
     return () => clearInterval(interval);
   }, [fetchRooms]);
 
-  async function createRoom() {
-    setCreating(true);
+  async function startGame(gameType: GameType) {
+    if (creating) return;
+    setCreating(gameType);
     try {
       const res = await fetch(`${API}/api/rooms`, {
         method: 'POST',
@@ -44,12 +48,11 @@ export default function HomePage({ toast }: Props) {
       if (!res.ok) throw new Error('Room erstellen fehlgeschlagen');
       const { code } = await res.json();
       setActiveRoom(code);
-      setShowModal(false);
       navigate(`/rooms/${code}/lobby`);
     } catch (e) {
       toast(String(e), 'error');
     } finally {
-      setCreating(false);
+      setCreating(null);
     }
   }
 
@@ -73,85 +76,69 @@ export default function HomePage({ toast }: Props) {
     }
   }
 
+  const activeRooms = rooms.filter((r) => r.room_phase !== 'GAME_OVER');
+
   return (
     <div className="home-page">
-      <div className="home-header">
-        <div>
-          <h1 className="home-title">Lobbys</h1>
-          <p className="home-subtitle">Wähle eine bestehende Lobby oder erstelle eine neue.</p>
+      <div className="game-select-section">
+        <div className="game-select-header">
+          <h1 className="game-select-title">Spiel auswählen</h1>
+          <p className="game-select-subtitle">Wähle ein Spielformat und starte sofort eine neue Session.</p>
         </div>
-        <div className="home-header-actions">
-          <button className="btn-secondary btn-sm" onClick={() => navigate('/builder/jeopardy')}>
+
+        <div className="game-type-grid">
+          {GAME_TYPES.map((g) => (
+            <button
+              key={g.id}
+              className={`game-type-card ${creating === g.id ? 'loading' : ''}`}
+              onClick={() => startGame(g.id)}
+              disabled={!!creating}
+            >
+              {g.logo
+                ? <img src={g.logo} alt={g.id} className="game-type-card-logo" />
+                : <span className="game-type-card-icon">{g.icon}</span>
+              }
+              <span className="game-type-card-desc">{g.description}</span>
+              {creating === g.id && <span className="game-type-card-spinner" />}
+            </button>
+          ))}
+        </div>
+
+        <div className="game-select-tools">
+          <button className="btn-ghost btn-sm" onClick={() => navigate('/builder/jeopardy')}>
             Quiz-Builder
           </button>
-          <button className="btn-secondary btn-sm" onClick={() => navigate('/library')}>
+          <button className="btn-ghost btn-sm" onClick={() => navigate('/library')}>
             Bibliothek
-          </button>
-          <button className="btn-primary" onClick={() => setShowModal(true)}>
-            + Neue Lobby
           </button>
         </div>
       </div>
 
-      {rooms.length === 0 ? (
-        <div className="empty-state">
-          <p>Keine aktiven Lobbys vorhanden.</p>
-          <button className="btn-primary" style={{ marginTop: 12 }} onClick={() => setShowModal(true)}>
-            Erste Lobby erstellen
-          </button>
-        </div>
-      ) : (
-        <div className="rooms-grid">
-          {rooms.map((room) => (
-            <div key={room.roomCode} className="room-card-wrapper">
-              <button className="room-card" onClick={() => openRoom(room)}>
-                <div className="room-card-code">{room.roomCode}</div>
-                <div className="room-card-meta">
-                  <span className="room-card-game">
-                    {GAME_TYPE_LABELS[room.game_type as string] ?? room.game_type}
-                  </span>
-                  <span className={`room-card-phase phase-${String(room.room_phase).toLowerCase()}`}>
+      {activeRooms.length > 0 && (
+        <div className="active-rooms-section">
+          <div className="active-rooms-header">
+            <span className="active-rooms-label">AKTIVE SESSIONS</span>
+            <span className="active-rooms-count">{activeRooms.length}</span>
+          </div>
+          <div className="active-rooms-list">
+            {activeRooms.map((room) => (
+              <div key={room.roomCode} className="active-room-row">
+                <button className="active-room-btn" onClick={() => openRoom(room)}>
+                  <span className="active-room-code">{room.roomCode}</span>
+                  <span className={`active-room-phase phase-${String(room.room_phase).toLowerCase()}`}>
                     {PHASE_LABELS[room.room_phase as string] ?? room.room_phase}
                   </span>
-                </div>
-                <div className="room-card-players">
-                  {(room.scores?.length ?? 0)} Spieler
-                </div>
-              </button>
-              <button
-                className="room-card-close"
-                onClick={(e) => closeRoom(e, room.roomCode)}
-                title="Raum schließen"
-              >
-                ✕
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {showModal && (
-        <div className="modal-backdrop" onClick={() => setShowModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2 className="modal-title">Neue Lobby erstellen</h2>
-            <div className="form-group">
-              <label className="form-label">Spiel-Typ</label>
-              <select
-                className="form-select"
-                value={gameType}
-                onChange={(e) => setGameType(e.target.value as GameType)}
-              >
-                <option value="jeopardy">Jeopardy</option>
-              </select>
-            </div>
-            <div className="modal-actions">
-              <button className="btn-secondary" onClick={() => setShowModal(false)}>
-                Abbrechen
-              </button>
-              <button className="btn-primary" onClick={createRoom} disabled={creating}>
-                {creating ? 'Erstelle…' : 'Erstellen'}
-              </button>
-            </div>
+                  <span className="active-room-players">{(room.scores?.length ?? 0)} Spieler</span>
+                </button>
+                <button
+                  className="active-room-close"
+                  onClick={(e) => closeRoom(e, room.roomCode)}
+                  title="Raum schließen"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       )}

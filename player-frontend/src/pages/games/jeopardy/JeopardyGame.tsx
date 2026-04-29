@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useGameStore } from '../../../store/gameStore';
 import { buzz } from '../../../ws/socket';
 import { playBuzz, playCorrect, playWrong } from '../../../audio';
+import { getGameLogo } from '../../../utils/gameLogos';
 
 const BACKEND = import.meta.env.VITE_API_URL ?? `http://${window.location.hostname}`;
 
@@ -27,7 +28,9 @@ export default function JeopardyGame() {
     roomCode,
     revealedAnswer,
     lastAnswerResult,
+    gameType,
   } = useGameStore();
+  const gameLogo = getGameLogo(gameType);
 
   const [deltas, setDeltas] = useState<Record<string, ScoreDelta>>({});
   const prevScores = useRef<Record<string, number>>({});
@@ -158,7 +161,10 @@ export default function JeopardyGame() {
       {/* Nav */}
       <nav className="game-nav">
         <div className="game-nav-brand">
-          <span className="game-nav-brand-icon">⚡</span>BrainStorm
+          {gameLogo
+            ? <img src={gameLogo} alt="Game Logo" className="game-nav-brand-img" />
+            : <span className="game-nav-brand-icon">⚡</span>
+          }
         </div>
         <div className="game-nav-progress">
           <div className="game-nav-progress-bar">

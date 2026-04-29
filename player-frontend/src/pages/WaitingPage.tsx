@@ -1,10 +1,12 @@
 import { useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useGameStore } from '../store/gameStore';
+import { getGameLogo } from '../utils/gameLogos';
 
 export default function WaitingPage() {
   const navigate = useNavigate();
-  const { myPlayerName, myPlayerId, roomCode, players, roomPhase, roomReset, clearRoomReset } = useGameStore();
+  const { myPlayerName, myPlayerId, roomCode, players, roomPhase, roomReset, clearRoomReset, gameType } = useGameStore();
+  const gameLogo = getGameLogo(gameType);
 
   useEffect(() => {
     if (roomReset) { clearRoomReset(); navigate('/'); return; }
@@ -25,7 +27,10 @@ export default function WaitingPage() {
     <div className="waiting-page">
       <div className="waiting-brand">
         <div className="waiting-brand-logo">
-          <span className="waiting-brand-icon">⚡</span>BrainStorm
+          {gameLogo
+            ? <img src={gameLogo} alt="Game Logo" className="waiting-brand-img" />
+            : <span className="waiting-brand-icon">⚡</span>
+          }
         </div>
         <div className="waiting-status">Warte auf den Moderator…</div>
         <div className="waiting-info">

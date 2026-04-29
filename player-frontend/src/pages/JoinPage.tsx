@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { connect } from '../ws/socket';
 import { useGameStore } from '../store/gameStore';
+import { getGameLogo } from '../utils/gameLogos';
 
 const API = import.meta.env.VITE_API_URL ?? `http://${window.location.hostname}`;
 
@@ -16,6 +17,8 @@ export default function JoinPage() {
   const [name, setName] = useState('');
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
+  const [gameLogo, setGameLogo] = useState<string | null>(null);
+  const [logoLoading, setLogoLoading] = useState(false);
   const codeRef = useRef<HTMLInputElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
 
@@ -23,6 +26,25 @@ export default function JoinPage() {
     if (code.length === 6) nameRef.current?.focus();
     else codeRef.current?.focus();
   }, []);
+
+  // Fetch game type as soon as 6-char code is complete
+  useEffect(() => {
+    if (code.length !== 6) {
+      setGameLogo(null);
+      return;
+    }
+    let cancelled = false;
+    setLogoLoading(true);
+    fetch(`${API}/api/rooms/${code}`)
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (cancelled) return;
+        setGameLogo(data ? getGameLogo(data.game_type) : null);
+      })
+      .catch(() => { if (!cancelled) setGameLogo(null); })
+      .finally(() => { if (!cancelled) setLogoLoading(false); });
+    return () => { cancelled = true; };
+  }, [code]);
 
   const codeOk = code.length === 6;
   const nameOk = name.trim().length > 0;
@@ -59,7 +81,15 @@ export default function JoinPage() {
       <div className="join-card">
         <div className="join-brand">
           <div className="join-brand-logo">
-            <span className="join-brand-icon">⚡</span>BrainStorm
+            {gameLogo ? (
+              <img src={gameLogo} alt="Game Logo" className="join-brand-img" />
+            ) : logoLoading ? (
+              <div className="join-brand-spinner" />
+            ) : (
+              <div className="join-brand-placeholder">
+                <span className="join-brand-placeholder-icon">⚡</span>
+              </div>
+            )}
           </div>
           <div className="join-brand-subtitle">Gib deinen Room-Code und Namen ein</div>
         </div>

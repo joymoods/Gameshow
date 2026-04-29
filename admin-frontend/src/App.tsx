@@ -46,7 +46,7 @@ function Toasts({ toasts }: { toasts: Toast[] }) {
 // ---- Nav ----
 
 const PAGE_TITLES: Record<string, string> = {
-  '/': 'Lobbys',
+  '/': 'Spiele',
   '/builder/jeopardy': 'Quiz-Builder',
   '/library': 'Quiz-Bibliothek',
 };
@@ -69,7 +69,6 @@ function Nav({ onEndGame }: { onEndGame?: () => void }) {
     <nav className="app-nav">
       <a className="nav-brand" href="/admin" style={{ textDecoration: 'none' }}>
         <span className="nav-brand-icon">⚡</span>
-        BrainStorm
       </a>
       {subtitle && <span className="nav-subtitle">{subtitle}</span>}
       <div className="nav-spacer" />

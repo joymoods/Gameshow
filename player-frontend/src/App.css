@@ -68,13 +68,27 @@ input { font-family: inherit; outline: none; transition: border-color 0.2s, box-
   margin-bottom: 36px;
 }
 .join-brand-logo {
-  font-size: 46px;
-  font-weight: 800;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
   margin-bottom: 10px;
+}
+.join-brand-img { width: 200px; height: auto; object-fit: contain; }
+.join-brand-placeholder {
+  width: 200px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.join-brand-placeholder-icon { font-size: 36px; opacity: 0.25; }
+.join-brand-spinner {
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
 }
 .join-brand-icon { color: var(--gold); }
 .join-brand-subtitle { color: var(--text-muted); font-size: 14px; }
@@ -174,14 +188,12 @@ input { font-family: inherit; outline: none; transition: border-color 0.2s, box-
   text-align: center;
 }
 .waiting-brand-logo {
-  font-size: 30px;
-  font-weight: 800;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
   margin-bottom: 12px;
 }
+.waiting-brand-img { width: 180px; height: auto; object-fit: contain; }
 .waiting-brand-icon { color: var(--gold); }
 .waiting-status { color: var(--gold); font-weight: 700; font-size: 19px; margin-bottom: 6px; }
 .waiting-info   { color: var(--text-muted); font-size: 13px; }
@@ -275,12 +287,10 @@ input { font-family: inherit; outline: none; transition: border-color 0.2s, box-
   z-index: 10;
 }
 .game-nav-brand {
-  font-weight: 800;
-  font-size: 18px;
   display: flex;
   align-items: center;
-  gap: 7px;
 }
+.game-nav-brand-img { height: 30px; width: auto; object-fit: contain; }
 .game-nav-brand-icon { color: var(--gold); }
 .game-nav-progress   { display: flex; align-items: center; gap: 8px; margin-left: 8px; }
 .game-nav-progress-bar { width: 100px; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }

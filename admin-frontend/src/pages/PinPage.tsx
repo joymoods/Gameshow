@@ -24,7 +24,7 @@ export default function PinPage({ onAuth }: Props) {
     <div className="pin-gate">
       <div className="pin-card">
         <div className="pin-icon">⚡</div>
-        <h1 className="pin-title">BrainStorm Admin</h1>
+        <h1 className="pin-title">Game Admin</h1>
         <p className="pin-subtitle">PIN eingeben</p>
         <form onSubmit={submit} className="pin-form">
           <input
