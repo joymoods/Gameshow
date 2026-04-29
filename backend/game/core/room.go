@@ -101,6 +101,33 @@ func (r *Room) RemovePlayer(id string) {
 	}
 }
 
+// KickPlayer removes the player entirely from the room (Players + PlayerOrder).
+func (r *Room) KickPlayer(id string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	found := false
+	filtered := r.Players[:0]
+	for _, p := range r.Players {
+		if p.ID == id {
+			found = true
+		} else {
+			filtered = append(filtered, p)
+		}
+	}
+	if !found {
+		return false
+	}
+	r.Players = filtered
+	order := r.PlayerOrder[:0]
+	for _, oid := range r.PlayerOrder {
+		if oid != id {
+			order = append(order, oid)
+		}
+	}
+	r.PlayerOrder = order
+	return true
+}
+
 func (r *Room) GetPlayer(id string) *Player {
 	r.mu.RLock()
 	defer r.mu.RUnlock()

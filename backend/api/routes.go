@@ -342,6 +342,19 @@ func (ro *Router) handlePlayerRoutes(w http.ResponseWriter, r *http.Request, roo
 		return
 	}
 
+	// DELETE /api/rooms/:code/players/:playerID  — kick player
+	if r.Method == http.MethodDelete && rest != "" && !strings.Contains(rest, "/") {
+		playerID := rest
+		if !room.KickPlayer(playerID) {
+			writeError(w, http.StatusNotFound, "player not found")
+			return
+		}
+		ro.wsHandler.KickPlayerClient(room.Code, playerID)
+		ro.wsHandler.BroadcastGameState(room)
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+		return
+	}
+
 	parts := strings.SplitN(rest, "/", 2)
 	if len(parts) == 2 && parts[1] == "score" && r.Method == http.MethodPost {
 		playerID := parts[0]

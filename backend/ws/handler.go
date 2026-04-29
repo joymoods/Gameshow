@@ -207,6 +207,10 @@ func (h *Handler) ResetRoomPlayers(roomCode string) {
 	h.hub.ResetRoomPlayers(roomCode)
 }
 
+func (h *Handler) KickPlayerClient(roomCode, playerID string) {
+	h.hub.KickPlayerClient(roomCode, playerID)
+}
+
 func (h *Handler) BroadcastGameState(room *core.Room) {
 	h.hub.SendToAdmin(buildGameState(room))
 	h.hub.BroadcastToPlayers(buildPublicGameState(room))

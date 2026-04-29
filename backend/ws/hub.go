@@ -114,6 +114,21 @@ func (h *Hub) ResetRoomPlayers(roomCode string) {
 	}
 }
 
+// KickPlayerClient sends a KICKED message to the player and closes their connection.
+func (h *Hub) KickPlayerClient(roomCode, playerID string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for _, c := range h.clients {
+		if c.IsAdmin || c.RoomCode != roomCode || c.PlayerID != playerID {
+			continue
+		}
+		select {
+		case c.send <- OutgoingMessage{Type: "KICKED", Payload: map[string]any{}}:
+		default:
+		}
+	}
+}
+
 // BroadcastToPlayers sends a message to all non-admin clients.
 func (h *Hub) BroadcastToPlayers(msg OutgoingMessage) {
 	h.mu.RLock()
