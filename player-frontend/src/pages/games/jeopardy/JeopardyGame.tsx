@@ -20,12 +20,11 @@ interface ScoreDelta {
 export default function JeopardyGame() {
   const {
     phase, board, players, playerOrder,
-    myPlayerId, myPlayerName,
+    myPlayerId,
     activePlayerId, activePlayerName,
     currentQuestion,
     buzzerOpen, hasBuzzed,
     buzzedPlayerId, buzzedPlayerName,
-    roomCode,
     revealedAnswer,
     lastAnswerResult,
     gameType,
@@ -84,12 +83,7 @@ export default function JeopardyGame() {
     }
   }, [lastAnswerResult]);  // eslint-disable-line react-hooks/exhaustive-deps
 
-  const me = players.find((p) => p.id === myPlayerId);
-  const myScore = me?.score ?? 0;
   const leaderboard = [...players].sort((a, b) => b.score - a.score);
-
-  const totalQ = board.reduce((a, c) => a + c.questions.length, 0);
-  const playedQ = board.reduce((a, c) => a + c.questions.filter((q) => q.played).length, 0);
 
   const orderedPlayers = playerOrder.length > 0
     ? playerOrder.map((id) => players.find((p) => p.id === id)).filter(Boolean) as typeof players
@@ -158,40 +152,14 @@ export default function JeopardyGame() {
 
   return (
     <div className="game-page">
-      {/* Nav */}
-      <nav className="game-nav">
-        <div className="game-nav-brand">
-          {gameLogo
-            ? <img src={gameLogo} alt="Game Logo" className="game-nav-brand-img" />
-            : <span className="game-nav-brand-icon">⚡</span>
-          }
-        </div>
-        <div className="game-nav-progress">
-          <div className="game-nav-progress-bar">
-            <div className="game-nav-progress-fill" style={{ width: `${totalQ ? (playedQ / totalQ) * 100 : 0}%` }} />
-          </div>
-          <span className="game-nav-progress-label">{playedQ}/{totalQ}</span>
-        </div>
-        <div className="game-nav-spacer" />
-        <div className="game-nav-identity">
-          <div className="game-nav-avatar">{myPlayerName[0]}</div>
-          <span className="game-nav-name">{myPlayerName}</span>
-        </div>
-        <div className="game-nav-score-box">
-          <span className="game-nav-score-label">Score</span>
-          <span className={`game-nav-score-value ${myScore < 0 ? 'negative' : 'positive'}`}>{myScore}</span>
-          {deltas[myPlayerId] && (
-            <span key={deltas[myPlayerId].key} className={`game-nav-score-delta ${deltas[myPlayerId].val > 0 ? 'positive' : 'negative'}`}>
-              {deltas[myPlayerId].val > 0 ? '+' : ''}{deltas[myPlayerId].val}
-            </span>
-          )}
-        </div>
-        {roomCode && <span className="game-nav-room-badge">{roomCode}</span>}
-      </nav>
-
       {/* Board area */}
       <div className="game-board-area">
         <div className="game-board-scroll">
+          {!showOverlay && gameLogo && (
+            <div className="game-board-logo-center">
+              <img src={gameLogo} alt="Logo" className="game-board-logo-center-img" />
+            </div>
+          )}
           <div className="game-board-header">
             <span className="game-board-label">BOARD</span>
             {showOverlay && (
@@ -227,24 +195,24 @@ export default function JeopardyGame() {
 
         {/* Player strip */}
         <div className="player-strip">
-          {orderedPlayers.map((p, i) => {
+          {orderedPlayers.map((p) => {
             const isActive = p.id === activePlayerId;
             const isMe = p.id === myPlayerId;
-            const avatarClass = isMe ? 'is-me' : isActive ? 'is-active' : 'default';
             const cardClass = isMe ? 'is-me' : isActive ? 'is-active' : '';
             return (
               <div key={p.id} className={`player-strip-card ${cardClass}`}>
-                <div className="player-strip-num">#{i + 1}</div>
-                <div className={`player-strip-avatar ${avatarClass}`}>{p.name[0]}</div>
                 {isActive && <div className="player-strip-active-label">● DRAN</div>}
-                <div className={`player-strip-name ${isMe ? 'is-me' : 'other'}`}>{p.name}</div>
-                <div style={{ position: 'relative', display: 'inline-block' }}>
-                  <div className={`player-strip-score ${p.score < 0 ? 'negative' : 'positive'}`}>{p.score}</div>
-                  {deltas[p.id] && (
-                    <span key={deltas[p.id].key} className={`player-strip-delta ${deltas[p.id].val > 0 ? 'positive' : 'negative'}`}>
-                      {deltas[p.id].val > 0 ? '+' : ''}{deltas[p.id].val}
-                    </span>
-                  )}
+                <div className="player-strip-person">🧑</div>
+                <div className="player-strip-bottom">
+                  <div className={`player-strip-name ${isMe ? 'is-me' : 'other'}`}>{p.name}</div>
+                  <div style={{ position: 'relative', display: 'inline-block' }}>
+                    <div className={`player-strip-score ${p.score < 0 ? 'negative' : 'positive'}`}>{p.score}</div>
+                    {deltas[p.id] && (
+                      <span key={deltas[p.id].key} className={`player-strip-delta ${deltas[p.id].val > 0 ? 'positive' : 'negative'}`}>
+                        {deltas[p.id].val > 0 ? '+' : ''}{deltas[p.id].val}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             );
