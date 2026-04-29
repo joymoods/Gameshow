@@ -127,23 +127,25 @@ Server → Player clients only:
 
 ## Admin-Frontend
 
-### Startseite (`/`)
+Erreichbar unter `/admin`. Alle Pfade sind relativ dazu.
+
+### Startseite (`/admin/`)
 - Liste aller aktiven Rooms
 - Room erstellen: Name + Spieltyp wählen
 - Zu bestehendem Room navigieren
 
-### Quiz-Builder (`/builder/jeopardy`)
+### Quiz-Builder (`/admin/builder/jeopardy`)
 - Kategorien + Fragen erstellen (Text, Bild, Audio, Video)
 - Quiz exportieren / importieren (JSON)
 - Upload in den aktiven Room
 
-### Lobby (`/rooms/:code/lobby`)
+### Lobby (`/admin/rooms/:code/lobby`)
 - Room-Code anzeigen + kopieren
 - Spieltyp anzeigen + wechseln (nur in Lobby möglich)
 - Spieler live sehen, Reihenfolge per Drag & Drop
 - Spiel starten
 
-### Control Panel (`/rooms/:code/control`)
+### Control Panel (`/admin/rooms/:code/control`)
 - Board-Ansicht: Frage auswählen
 - Aktiven Spieler + Buzzer-Phase sehen
 - Antwort als richtig/falsch bewerten
@@ -153,6 +155,8 @@ Server → Player clients only:
 ---
 
 ## Player-Frontend
+
+Erreichbar unter `/` (Root). Alle Pfade sind absolut.
 
 ### Join (`/`)
 - Room-Code + Name eingeben → WebSocket-Verbindung

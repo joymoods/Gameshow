@@ -7,7 +7,7 @@ import './App.css';
 
 export default function App() {
   return (
-    <BrowserRouter basename="/player">
+    <BrowserRouter>
       <Routes>
         <Route path="/" element={<JoinPage />} />
         <Route path="/waiting" element={<WaitingPage />} />

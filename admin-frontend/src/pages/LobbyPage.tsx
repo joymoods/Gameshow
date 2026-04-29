@@ -156,7 +156,7 @@ export default function LobbyPage({ toast }: Props) {
   if (!code) {
     return (
       <div style={{ padding: 24 }}>
-        <p>Kein Room-Code. <a href="/" style={{ color: 'var(--primary)' }}>Zur Startseite</a></p>
+        <p>Kein Room-Code. <a href="/admin" style={{ color: 'var(--primary)' }}>Zur Startseite</a></p>
       </div>
     );
   }

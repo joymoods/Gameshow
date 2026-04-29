@@ -65,7 +65,7 @@ function Nav({ onEndGame }: { onEndGame?: () => void }) {
 
   return (
     <nav className="app-nav">
-      <a className="nav-brand" href="/" style={{ textDecoration: 'none' }}>
+      <a className="nav-brand" href="/admin" style={{ textDecoration: 'none' }}>
         <span className="nav-brand-icon">⚡</span>
         BrainStorm
       </a>
@@ -179,7 +179,7 @@ export default function App() {
   }
 
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/admin">
       <AppShell />
     </BrowserRouter>
   );

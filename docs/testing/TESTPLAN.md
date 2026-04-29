@@ -44,8 +44,8 @@ Alle drei Container müssen `running` sein: `backend`, `caddy`.
 
 | Dienst | URL |
 |--------|-----|
-| Admin-Frontend | `http://192.168.178.130/` |
-| Player-Frontend | `http://192.168.178.130/player` |
+| Player-Frontend | `http://192.168.178.130/` |
+| Admin-Frontend | `http://192.168.178.130/admin` |
 | Backend API | `http://192.168.178.130/api` |
 | WebSocket | `ws://192.168.178.130/ws` |
 
@@ -143,7 +143,7 @@ curl -s http://192.168.178.130/api/rooms
 
 ### 2.2 Admin-Frontend lädt
 
-1. Browser öffnen → `http://192.168.178.130/`
+1. Browser öffnen → `http://192.168.178.130/admin`
 2. Seite lädt ohne Fehler
 3. Titel "BrainStorm" oder Rooms-Übersicht sichtbar
 
@@ -151,7 +151,7 @@ curl -s http://192.168.178.130/api/rooms
 
 ### 2.3 Player-Frontend lädt
 
-1. Browser → `http://192.168.178.130/player`
+1. Browser → `http://192.168.178.130/`
 2. Join-Formular (Room-Code + Name) sichtbar
 
 **Erwartetes Ergebnis:** Eingabefelder für Code und Name vorhanden
@@ -336,7 +336,7 @@ curl -s -X POST http://192.168.178.130/api/media/upload \
 
 ### 5.1 Rooms-Übersicht
 
-1. `http://192.168.178.130/` öffnen
+1. `http://192.168.178.130/admin` öffnen
 2. Liste der aktiven Rooms ist sichtbar
 3. Rooms werden alle 5 Sekunden aktualisiert (Polling läuft im Hintergrund)
 
@@ -394,7 +394,7 @@ curl -s -X POST http://192.168.178.130/api/media/upload \
 2. QR-Code scannen
 3. Player-Frontend öffnet sich im Browser des Smartphones
 
-**Erwartetes Ergebnis:** `http://192.168.178.130/player` öffnet sich mit vorausgefülltem Code
+**Erwartetes Ergebnis:** `http://192.168.178.130/` öffnet sich mit vorausgefülltem Code
 
 ### 6.3 Room-Code kopieren
 
@@ -609,7 +609,7 @@ curl -s -X POST http://192.168.178.130/api/media/upload \
 
 ### 9.1 Seite lädt
 
-1. `http://192.168.178.130/player` öffnen
+1. `http://192.168.178.130/` öffnen
 2. Eingabefelder für Code und Name sind sichtbar
 
 **Erwartetes Ergebnis:** Saubere JoinPage ohne Fehler
@@ -809,13 +809,13 @@ curl -s -X POST http://192.168.178.130/api/media/upload \
 
 ### Phase 1 – Vorbereitung
 
-1. Admin: `http://192.168.178.130/` öffnen
+1. Admin: `http://192.168.178.130/admin` öffnen
 2. Admin: "Neuen Room erstellen" klicken → Code merken
 3. Admin: Zur LobbyPage navigieren
 4. Admin: Quiz hochladen – entweder:
    - **Per Terminal:** `curl -s -X POST http://192.168.178.130/api/rooms/$CODE/quiz -H "Content-Type: application/json" -d @/tmp/quiz.json`
-   - **Per Browser:** `/builder/jeopardy` öffnen → Import JSON → quiz.json auswählen → Room-Code eingeben → "Upload to Room"
-5. Player 1: `http://192.168.178.130/player` öffnen, Code eingeben, Name "Alice", beitreten
+   - **Per Browser:** `/admin/builder/jeopardy` öffnen → Import JSON → quiz.json auswählen → Room-Code eingeben → "Upload to Room"
+5. Player 1: `http://192.168.178.130/` öffnen, Code eingeben, Name "Alice", beitreten
 6. Player 2: Inkognito-Tab, gleiche URL, Name "Bob", beitreten
 7. Admin: Beide Spieler erscheinen in der Lobby
 

@@ -192,7 +192,7 @@ export default function ControlPage({ toast }: Props) {
   if (!roomCode) {
     return (
       <div style={{ padding: 24 }}>
-        <p>Kein aktiver Room. <a href="/" style={{ color: 'var(--primary)' }}>Zurück</a></p>
+        <p>Kein aktiver Room. <a href="/admin" style={{ color: 'var(--primary)' }}>Zurück</a></p>
       </div>
     );
   }

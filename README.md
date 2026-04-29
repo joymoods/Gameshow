@@ -73,13 +73,13 @@ Abgedeckt: `game/core` (Manager, Room), `game/jeopardy` (Spiellogik), `api` (RES
 ### 1. Frontends bauen
 
 Für das Caddy-Setup laufen Admin- und Player-Frontend auf derselben Origin.
-Das Player-Frontend wird unter `/player` erreichbar sein.
+Das Player-Frontend ist unter `/`, das Admin-Frontend unter `/admin` erreichbar.
 
 ```bash
 # Admin-Frontend
 cd admin-frontend
 echo "VITE_API_URL=" > .env
-echo "VITE_PLAYER_URL=http://DEINE-IP/player" >> .env
+echo "VITE_PLAYER_URL=http://DEINE-IP/" >> .env
 npm run build
 
 # Player-Frontend
@@ -101,8 +101,8 @@ docker compose up -d
 Der Stack ist dann erreichbar unter:
 | URL | Beschreibung |
 |---|---|
-| `http://DEINE-IP/` | Admin-Frontend |
-| `http://DEINE-IP/player` | Player-Frontend |
+| `http://DEINE-IP/` | Player-Frontend |
+| `http://DEINE-IP/admin` | Admin-Frontend |
 | `http://DEINE-IP/api/` | Backend REST API |
 | `ws://DEINE-IP/ws` | WebSocket |
 

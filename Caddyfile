@@ -14,16 +14,19 @@
         reverse_proxy backend:8080
     }
 
-    # Player-Frontend (unter /player)
-    handle_path /player/* {
-        root * /srv/player
+    # Admin-Frontend (unter /admin)
+    handle /admin {
+        redir * /admin/ 301
+    }
+    handle_path /admin/* {
+        root * /srv/admin
         try_files {path} /index.html
         file_server
     }
 
-    # Admin-Frontend (Root)
+    # Player-Frontend (Root)
     handle {
-        root * /srv/admin
+        root * /srv/player
         try_files {path} /index.html
         file_server
     }
