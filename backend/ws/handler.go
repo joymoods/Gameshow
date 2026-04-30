@@ -45,6 +45,14 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	h.hub.Register(c)
 	defer func() {
+		// If camera was active, notify peers before unregistering.
+		if c.CamOn {
+			h.hub.Broadcast(OutgoingMessage{
+				Type:    MsgCamOff,
+				Payload: map[string]any{"from": clientPeerID(c)},
+			})
+			h.hub.UnregisterCam(clientID)
+		}
 		h.hub.Unregister(c)
 		if c.PlayerID != "" && c.RoomCode != "" {
 			room, ok := h.manager.GetRoom(c.RoomCode)
@@ -94,12 +102,64 @@ func (h *Handler) route(c *Client, msg IncomingMessage) {
 		h.handleBuzz(c)
 	case MsgPing:
 		c.Send(OutgoingMessage{Type: MsgPong, Payload: msg.Payload})
+	case MsgWebRTCOffer, MsgWebRTCAnswer, MsgWebRTCIce:
+		h.handleWebRTCRelay(c, msg)
+	case MsgCamOn:
+		h.handleCamOn(c, msg.Payload)
+	case MsgCamOff:
+		h.handleCamOff(c)
 	default:
 		log.Printf("unknown message type: %s", msg.Type)
 		c.Send(OutgoingMessage{Type: MsgError, Payload: ErrorPayload{
 			Message: "unknown message type: " + msg.Type,
 		}})
 	}
+}
+
+// clientPeerID returns the peer-visible ID for signaling: "admin" or the player's UUID.
+func clientPeerID(c *Client) string {
+	if c.IsAdmin {
+		return "admin"
+	}
+	return c.PlayerID
+}
+
+func (h *Handler) handleWebRTCRelay(c *Client, msg IncomingMessage) {
+	to, _ := msg.Payload["to"].(string)
+	if to == "" {
+		return
+	}
+	msg.Payload["from"] = clientPeerID(c)
+	h.hub.SendToPeer(to, OutgoingMessage{Type: msg.Type, Payload: msg.Payload})
+}
+
+func (h *Handler) handleCamOn(c *Client, payload map[string]any) {
+	name, _ := payload["name"].(string)
+	peerID := clientPeerID(c)
+	if peerID == "" {
+		return // player hasn't joined a room yet
+	}
+	c.CamOn = true
+	others := h.hub.RegisterCam(c.ID, peerID, name)
+	h.hub.Broadcast(OutgoingMessage{
+		Type:    MsgCamOn,
+		Payload: map[string]any{"from": peerID, "name": name},
+	})
+	// Inform the enabling client about all existing cameras so it can initiate connections.
+	c.Send(OutgoingMessage{
+		Type:    MsgCamState,
+		Payload: map[string]any{"cams": others},
+	})
+}
+
+func (h *Handler) handleCamOff(c *Client) {
+	peerID := clientPeerID(c)
+	c.CamOn = false
+	h.hub.UnregisterCam(c.ID)
+	h.hub.Broadcast(OutgoingMessage{
+		Type:    MsgCamOff,
+		Payload: map[string]any{"from": peerID},
+	})
 }
 
 func (h *Handler) handleJoinGame(c *Client, payload map[string]any) {
