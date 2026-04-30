@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { useGameStore } from '../store/gameStore';
 import JeopardyGame from './games/jeopardy/JeopardyGame';
 
@@ -18,10 +18,6 @@ export default function GamePage() {
     case 'jeopardy':
       return <JeopardyGame />;
     default:
-      return (
-        <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>
-          <p>Unbekannter Spieltyp: <strong>{gameType ?? '…'}</strong></p>
-        </div>
-      );
+      return <Navigate to="/" replace />;
   }
 }

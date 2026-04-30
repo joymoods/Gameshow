@@ -3,6 +3,7 @@ import { useGameStore } from '../../../store/gameStore';
 import { buzz } from '../../../ws/socket';
 import { playBuzz, playCorrect, playWrong } from '../../../audio';
 import { getGameLogo } from '../../../utils/gameLogos';
+import { useWebRTC } from '../../../hooks/useWebRTC';
 
 const BACKEND = import.meta.env.VITE_API_URL ?? `http://${window.location.hostname}`;
 
@@ -17,10 +18,36 @@ interface ScoreDelta {
   key: number;
 }
 
+function CamTile({ stream, name, isSelf }: { stream: MediaStream | null; name: string; isSelf: boolean }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [stream]);
+
+  if (!stream) {
+    return (
+      <div className="cam-tile cam-tile--avatar">
+        <span className="cam-tile-initial">{name[0]?.toUpperCase() ?? '?'}</span>
+      </div>
+    );
+  }
+  return (
+    <video
+      ref={videoRef}
+      autoPlay
+      playsInline
+      muted={isSelf}
+      className={`cam-tile cam-tile--video${isSelf ? ' cam-tile--mirrored' : ''}`}
+    />
+  );
+}
+
 export default function JeopardyGame() {
   const {
     phase, board, players, playerOrder,
-    myPlayerId,
+    myPlayerId, myPlayerName,
     activePlayerId, activePlayerName,
     currentQuestion,
     buzzerOpen, hasBuzzed,
@@ -30,6 +57,7 @@ export default function JeopardyGame() {
     gameType,
   } = useGameStore();
   const gameLogo = getGameLogo(gameType);
+  const { camEnabled, activeCams, myStream, toggleCam } = useWebRTC(myPlayerId, myPlayerName);
 
   const [deltas, setDeltas] = useState<Record<string, ScoreDelta>>({});
   const prevScores = useRef<Record<string, number>>({});
@@ -82,8 +110,6 @@ export default function JeopardyGame() {
       lastAnswerResult.correct ? playCorrect() : playWrong();
     }
   }, [lastAnswerResult]);  // eslint-disable-line react-hooks/exhaustive-deps
-
-  const leaderboard = [...players].sort((a, b) => b.score - a.score);
 
   const orderedPlayers = playerOrder.length > 0
     ? playerOrder.map((id) => players.find((p) => p.id === id)).filter(Boolean) as typeof players
@@ -155,20 +181,11 @@ export default function JeopardyGame() {
       {/* Board area */}
       <div className="game-board-area">
         <div className="game-board-scroll">
-          {!showOverlay && gameLogo && (
+          {gameLogo && (
             <div className="game-board-logo-center">
               <img src={gameLogo} alt="Logo" className="game-board-logo-center-img" />
             </div>
           )}
-          <div className="game-board-header">
-            <span className="game-board-label">BOARD</span>
-            {showOverlay && (
-              <div className="game-board-status">
-                <span style={{ color: statusCfg.color }}>{statusCfg.icon}</span>
-                <span style={{ color: statusCfg.color, fontWeight: 600 }}>{statusCfg.text}</span>
-              </div>
-            )}
-          </div>
           <div
             className="game-board-grid"
             style={{
@@ -195,14 +212,39 @@ export default function JeopardyGame() {
 
         {/* Player strip */}
         <div className="player-strip">
+          {/* Admin camera tile */}
+          {activeCams.has('admin') && (
+            <div className="player-strip-card">
+              <div className="player-strip-cam">
+                <CamTile
+                  stream={activeCams.get('admin')!.stream}
+                  name={activeCams.get('admin')!.name || 'Moderator'}
+                  isSelf={false}
+                />
+              </div>
+              <div className="player-strip-bottom">
+                <div className="player-strip-name other">Moderator</div>
+              </div>
+            </div>
+          )}
+
           {orderedPlayers.map((p) => {
             const isActive = p.id === activePlayerId;
             const isMe = p.id === myPlayerId;
             const cardClass = isMe ? 'is-me' : isActive ? 'is-active' : '';
+            const peerCam = isMe
+              ? (camEnabled ? { stream: myStream.current, name: p.name } : null)
+              : activeCams.get(p.id) ?? null;
             return (
               <div key={p.id} className={`player-strip-card ${cardClass}`}>
                 {isActive && <div className="player-strip-active-label">● DRAN</div>}
-                <div className="player-strip-person">🧑</div>
+                <div className="player-strip-cam">
+                  <CamTile
+                    stream={peerCam?.stream ?? null}
+                    name={p.name}
+                    isSelf={isMe}
+                  />
+                </div>
                 <div className="player-strip-bottom">
                   <div className={`player-strip-name ${isMe ? 'is-me' : 'other'}`}>{p.name}</div>
                   <div style={{ position: 'relative', display: 'inline-block' }}>
@@ -217,6 +259,15 @@ export default function JeopardyGame() {
               </div>
             );
           })}
+
+          {/* Camera toggle button */}
+          <button
+            className={`cam-toggle-btn ${camEnabled ? 'cam-on' : 'cam-off'}`}
+            onClick={toggleCam}
+            title={camEnabled ? 'Kamera ausschalten' : 'Kamera einschalten'}
+          >
+            {camEnabled ? '📷' : '📵'}
+          </button>
         </div>
       </div>
 
@@ -288,16 +339,6 @@ export default function JeopardyGame() {
             </div>
           </div>
 
-          {/* Mini leaderboard */}
-          <div className="mini-leaderboard">
-            {leaderboard.map((p, i) => (
-              <div key={p.id} className={`mini-lb-entry ${p.id === myPlayerId ? 'is-me' : ''}`}>
-                <span className="mini-lb-rank">#{i + 1}</span>
-                <span className={`mini-lb-name ${p.id === myPlayerId ? 'is-me' : ''}`}>{p.name}</span>
-                <span className={`mini-lb-score ${p.score < 0 ? 'negative' : 'positive'}`}>{p.score}</span>
-              </div>
-            ))}
-          </div>
         </div>
       )}
     </div>

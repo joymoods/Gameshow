@@ -369,6 +369,9 @@ input { font-family: inherit; outline: none; transition: border-color 0.2s, box-
   flex-direction: column;
   gap: 8px;
   min-height: 0;
+  width: 100%;
+  max-width: calc((100vh - 280px) * 16 / 9);
+  margin: 0 auto;
 }
 .game-board-header {
   display: flex;
@@ -440,6 +443,7 @@ input { font-family: inherit; outline: none; transition: border-color 0.2s, box-
   border-top: 1px solid var(--border);
   flex-shrink: 0;
   height: 280px;
+  justify-content: center;
 }
 .player-strip-card {
   flex: 1;
@@ -458,7 +462,7 @@ input { font-family: inherit; outline: none; transition: border-color 0.2s, box-
 .player-strip-card.is-active { border-color: var(--success); box-shadow: 0 0 14px rgba(34,197,94,0.25); }
 .player-strip-card.is-me     { border-color: var(--primary); box-shadow: 0 0 10px rgba(79,110,247,0.2); }
 .player-strip-active-label { font-size: 9px; color: var(--success); font-weight: 700; letter-spacing: 1px; flex-shrink: 0; }
-.player-strip-person { font-size: 56px; flex: 1; display: flex; align-items: center; justify-content: center; line-height: 1; }
+.player-strip-cam { flex: 1; width: 100%; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 6px; background: var(--surface2); }
 .player-strip-bottom { display: inline-flex; flex-direction: row; align-items: center; gap: 8px; flex-shrink: 0; border: 1px solid var(--border); border-radius: 7px; padding: 5px 10px; background: var(--bg); max-width: 100%; }
 .player-strip-name { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .player-strip-name.is-me { font-weight: 700; color: var(--text); }
@@ -479,10 +483,55 @@ input { font-family: inherit; outline: none; transition: border-color 0.2s, box-
 .player-strip-delta.positive { color: var(--success); }
 .player-strip-delta.negative { color: var(--danger); }
 
+/* ---- Camera tiles ---- */
+.cam-tile {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 6px;
+}
+.cam-tile--video { display: block; }
+.cam-tile--mirrored { transform: scaleX(-1); }
+.cam-tile--avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface2);
+  color: var(--text-muted);
+  font-size: 36px;
+  font-weight: 700;
+  border-radius: 6px;
+  width: 100%;
+  height: 100%;
+}
+.cam-tile-initial { line-height: 1; }
+
+/* Camera toggle button in player strip */
+.cam-toggle-btn {
+  align-self: center;
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.cam-toggle-btn.cam-off { background: var(--surface2); }
+.cam-toggle-btn.cam-on  { background: rgba(79,110,247,0.2); border: 2px solid var(--primary); }
+.cam-toggle-btn:hover   { transform: scale(1.1); }
+
 /* Question overlay */
 .question-overlay {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 280px;
   background: rgba(5,7,14,0.96);
   display: flex;
   flex-direction: column;

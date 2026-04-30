@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useGameStore } from '../store/gameStore';
 import type { Question } from '../types';
 import type { ToastType } from '../App';
+import { useWebRTC } from '../hooks/useWebRTC';
 
 const API = import.meta.env.VITE_API_URL ?? `http://${window.location.hostname}`;
 
@@ -15,12 +16,40 @@ interface Props {
   toast: (msg: string, type?: ToastType) => void;
 }
 
+// ---- Cam Tile ----
+
+function CamTile({ stream, name, isSelf }: { stream: MediaStream | null; name: string; isSelf: boolean }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [stream]);
+
+  if (!stream) {
+    return (
+      <div className="admin-cam-avatar">
+        {name[0]?.toUpperCase() ?? '?'}
+      </div>
+    );
+  }
+  return (
+    <video
+      ref={videoRef}
+      autoPlay
+      playsInline
+      muted={isSelf}
+      className={`admin-cam-video${isSelf ? ' admin-cam-video--mirrored' : ''}`}
+    />
+  );
+}
+
 // ---- Score Row ----
 
 function ScoreRow({
-  playerId, name, score, roomCode, isActive, delta,
+  playerId, name, score, roomCode, isActive, delta, camStream,
 }: {
-  playerId: string; name: string; score: number; roomCode: string; isActive: boolean; delta?: ScoreDelta;
+  playerId: string; name: string; score: number; roomCode: string; isActive: boolean; delta?: ScoreDelta; camStream?: MediaStream | null;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(String(score));
@@ -38,7 +67,13 @@ function ScoreRow({
 
   return (
     <div className="score-row">
-      <div className={`score-avatar ${isActive ? 'is-active' : 'not-active'}`}>{name[0]}</div>
+      <div className={`score-avatar ${isActive ? 'is-active' : 'not-active'}`}>
+        {camStream !== undefined ? (
+          <CamTile stream={camStream ?? null} name={name} isSelf={false} />
+        ) : (
+          name[0]
+        )}
+      </div>
       <span className={`score-name ${isActive ? 'is-active' : ''}`}>{name}</span>
       <div style={{ position: 'relative' }}>
         {delta && (
@@ -86,6 +121,8 @@ export default function ControlPage({ toast }: Props) {
   } = useGameStore();
   // Prefer URL param so the page works when navigated directly
   const roomCode = urlCode ?? storeRoomCode;
+
+  const { camEnabled, activeCams, myStream, toggleCam } = useWebRTC('admin', 'Moderator');
 
   const [answering, setAnswering] = useState(false);
   const [showAnswer, setShowAnswer] = useState(false);
@@ -397,20 +434,42 @@ export default function ControlPage({ toast }: Props) {
           )}
         </div>
 
-        {/* Scores */}
-        <div className="sidebar-section sidebar-section--grow" style={{ flex: 1 }}>
-          <div className="sidebar-label">SCORES</div>
-          {orderedPlayers.map((p) => (
-            <ScoreRow
-              key={p.id}
-              playerId={p.id}
-              name={p.name}
-              score={p.score}
-              roomCode={roomCode}
-              isActive={p.id === activePlayerId}
-              delta={deltas[p.id]}
-            />
-          ))}
+        {/* Scores + Cameras */}
+        <div className="sidebar-section sidebar-section--grow" style={{ flex: 1, overflowY: 'auto' }}>
+          <div className="sidebar-label-row">
+            <span className="sidebar-label">SCORES</span>
+            <button
+              className={`cam-toggle-btn ${camEnabled ? 'cam-on' : 'cam-off'}`}
+              onClick={toggleCam}
+              title={camEnabled ? 'Kamera ausschalten' : 'Kamera einschalten'}
+            >
+              {camEnabled ? '📷' : '📵'}
+            </button>
+          </div>
+          {/* Own camera preview when enabled */}
+          {camEnabled && myStream.current && (
+            <div className="admin-own-cam-row">
+              <div className="admin-own-cam-wrap">
+                <CamTile stream={myStream.current} name="Moderator" isSelf />
+              </div>
+              <span className="admin-own-cam-label">Du (Moderator)</span>
+            </div>
+          )}
+          {orderedPlayers.map((p) => {
+            const peer = activeCams.get(p.id);
+            return (
+              <ScoreRow
+                key={p.id}
+                playerId={p.id}
+                name={p.name}
+                score={p.score}
+                roomCode={roomCode}
+                isActive={p.id === activePlayerId}
+                delta={deltas[p.id]}
+                camStream={peer ? (peer.stream ?? null) : undefined}
+              />
+            );
+          })}
           <div className="score-hint">Score anklicken zum Bearbeiten</div>
         </div>
       </aside>

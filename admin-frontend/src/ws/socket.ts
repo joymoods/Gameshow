@@ -4,6 +4,17 @@ import type { WsMessage } from '../types';
 const _apiBase = import.meta.env.VITE_API_URL ?? `http://${window.location.hostname}`;
 const WS_URL = _apiBase.replace(/^https/, 'wss').replace(/^http/, 'ws') + '/ws?role=admin';
 
+type MsgListener = (msg: WsMessage) => void;
+const msgListeners: MsgListener[] = [];
+
+export function addMessageListener(fn: MsgListener): () => void {
+  msgListeners.push(fn);
+  return () => {
+    const i = msgListeners.indexOf(fn);
+    if (i >= 0) msgListeners.splice(i, 1);
+  };
+}
+
 let socket: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let reconnectDelay = 1000;
@@ -33,6 +44,7 @@ export function connect() {
     try {
       const msg: WsMessage = JSON.parse(event.data);
       useGameStore.getState().handleMessage(msg);
+      msgListeners.forEach((fn) => fn(msg));
     } catch (e) {
       console.error('WS parse error', e);
     }
