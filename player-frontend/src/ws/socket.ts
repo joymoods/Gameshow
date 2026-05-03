@@ -1,7 +1,7 @@
 import { useGameStore } from '../store/gameStore';
 import type { WsMessage } from '../types';
 
-const _apiBase = import.meta.env.VITE_API_URL ?? `http://${window.location.hostname}`;
+const _apiBase = import.meta.env.VITE_API_URL ?? `${window.location.protocol}//${window.location.hostname}`;
 const WS_URL = _apiBase.replace(/^https/, 'wss').replace(/^http/, 'ws') + '/ws';
 
 type MsgListener = (msg: WsMessage) => void;

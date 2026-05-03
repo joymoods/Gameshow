@@ -5,7 +5,7 @@ import type { GameType, RoomInfo } from '../types';
 import type { ToastType } from '../App';
 import brainstormLogo from '../assets/brainstorm-logo.png';
 
-const API = import.meta.env.VITE_API_URL ?? `http://${window.location.hostname}`;
+const API = import.meta.env.VITE_API_URL ?? `${window.location.protocol}//${window.location.hostname}`;
 
 const GAME_TYPES: { id: GameType; logo?: string; icon?: string; description: string }[] = [
   {

@@ -8,7 +8,7 @@ import type { Category, Question } from '../../../types';
 import type { ToastType } from '../../../App';
 import BoardPreview from '../../../components/BoardPreview';
 
-const API = import.meta.env.VITE_API_URL ?? `http://${window.location.hostname}`;
+const API = import.meta.env.VITE_API_URL ?? `${window.location.protocol}//${window.location.hostname}`;
 
 function emptyQuestion(categoryId: string): Question {
   return { id: uuidv4(), categoryId, points: 200, text: '', answer: '', played: false };

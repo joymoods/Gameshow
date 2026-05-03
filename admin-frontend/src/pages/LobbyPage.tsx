@@ -5,7 +5,7 @@ import { useLobbyStore } from '../store/lobbyStore';
 import type { ToastType } from '../App';
 import BoardPreview from '../components/BoardPreview';
 
-const API = import.meta.env.VITE_API_URL ?? `http://${window.location.hostname}`;
+const API = import.meta.env.VITE_API_URL ?? `${window.location.protocol}//${window.location.hostname}`;
 
 interface Props {
   toast: (msg: string, type?: ToastType) => void;

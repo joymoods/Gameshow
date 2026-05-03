@@ -5,7 +5,7 @@ import { playBuzz, playCorrect, playWrong } from '../../../audio';
 import { getGameLogo } from '../../../utils/gameLogos';
 import { useWebRTC } from '../../../hooks/useWebRTC';
 
-const BACKEND = import.meta.env.VITE_API_URL ?? `http://${window.location.hostname}`;
+const BACKEND = import.meta.env.VITE_API_URL ?? `${window.location.protocol}//${window.location.hostname}`;
 
 function mediaUrl(url?: string): string | undefined {
   if (!url) return undefined;

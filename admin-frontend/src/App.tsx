@@ -96,7 +96,7 @@ function ControlRoute({ toast }: { toast: (msg: string, type?: ToastType) => voi
 
   async function handleEndGame() {
     try {
-      await fetch(`${import.meta.env.VITE_API_URL ?? `http://${window.location.hostname}`}/api/rooms/${code}/end`, {
+      await fetch(`${import.meta.env.VITE_API_URL ?? `${window.location.protocol}//${window.location.hostname}`}/api/rooms/${code}/end`, {
         method: 'POST',
       });
     } catch { /* ignore */ }

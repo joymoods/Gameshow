@@ -5,7 +5,7 @@
     }
 
     # WebSocket
-    handle /ws {
+    handle /ws* {
         reverse_proxy backend:8080
     }
 

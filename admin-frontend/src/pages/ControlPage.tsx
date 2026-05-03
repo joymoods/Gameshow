@@ -5,7 +5,7 @@ import type { Question } from '../types';
 import type { ToastType } from '../App';
 import { useWebRTC } from '../hooks/useWebRTC';
 
-const API = import.meta.env.VITE_API_URL ?? `http://${window.location.hostname}`;
+const API = import.meta.env.VITE_API_URL ?? `${window.location.protocol}//${window.location.hostname}`;
 
 interface ScoreDelta {
   val: number;
