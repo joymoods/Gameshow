@@ -57,7 +57,7 @@ func main() {
 
 	mux.Handle("/ws", wsHandler)
 	apiRouter.Register(mux)
-	mux.HandleFunc("/api/media/upload", mediaHandler.ServeUpload)
+	mux.HandleFunc("/api/media/upload", apiRouter.WithAdminAuth(mediaHandler.ServeUpload))
 	mux.Handle("/media/", http.StripPrefix("/media/", http.FileServer(http.Dir(uploadDir))))
 
 	log.Printf("Games backend starting on :%s", port)

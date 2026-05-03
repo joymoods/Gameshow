@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 
 	"games/game/core"
@@ -24,10 +25,19 @@ func NewHandler(hub *Hub, manager *core.Manager) *Handler {
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	isAdmin := r.URL.Query().Get("role") == "admin"
+	isAdmin := false
+	if r.URL.Query().Get("role") == "admin" {
+		token := os.Getenv("ADMIN_TOKEN")
+		auth := r.Header.Get("Authorization")
+		if token == "" || strings.TrimPrefix(auth, "Bearer ") != token {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		isAdmin = true
+	}
 
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		InsecureSkipVerify: true,
+		InsecureSkipVerify: true, // origin check delegated to Caddy reverse proxy
 	})
 	if err != nil {
 		log.Printf("websocket accept error: %v", err)
@@ -193,7 +203,7 @@ func (h *Handler) handleJoinGame(c *Client, payload map[string]any) {
 
 	player, isNew, err := room.AddPlayer(playerName)
 	if err != nil {
-		c.Send(OutgoingMessage{Type: MsgError, Payload: ErrorPayload{Message: "name already taken"}})
+		c.Send(OutgoingMessage{Type: MsgError, Payload: ErrorPayload{Message: err.Error()}})
 		return
 	}
 	c.PlayerID = player.ID

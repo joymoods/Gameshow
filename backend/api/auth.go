@@ -18,6 +18,11 @@ func isAdmin(r *http.Request) bool {
 	return strings.TrimPrefix(auth, "Bearer ") == token
 }
 
+// WithAdminAuth is the exported variant for use outside the api package (e.g. main).
+func (ro *Router) WithAdminAuth(next http.HandlerFunc) http.HandlerFunc {
+	return ro.withAdminAuth(next)
+}
+
 // withAdminAuth wraps a handler and returns 401 for unauthenticated callers.
 // OPTIONS preflight requests bypass auth (handled upstream by withCORS).
 func (ro *Router) withAdminAuth(next http.HandlerFunc) http.HandlerFunc {
