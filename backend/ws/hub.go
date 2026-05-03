@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"sync"
+	"time"
 
 	"nhooyr.io/websocket"
 	"nhooyr.io/websocket/wsjson"
@@ -164,8 +165,12 @@ func (h *Hub) SendToClient(playerID string, msg OutgoingMessage) {
 }
 
 // writePump sends queued messages to the WebSocket connection.
+// A 30s ticker sends application-level PINGs to keep the connection alive
+// through proxies (e.g. Cloudflare Tunnel) that drop idle WebSocket connections.
 func (c *Client) writePump(ctx context.Context) {
 	defer c.conn.Close(websocket.StatusNormalClosure, "")
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
 	for {
 		select {
 		case msg, ok := <-c.send:
@@ -174,6 +179,12 @@ func (c *Client) writePump(ctx context.Context) {
 			}
 			if err := wsjson.Write(ctx, c.conn, msg); err != nil {
 				log.Printf("write error for client %s: %v", c.ID, err)
+				return
+			}
+		case <-ticker.C:
+			ping := OutgoingMessage{Type: MsgPing, Payload: map[string]any{}}
+			if err := wsjson.Write(ctx, c.conn, ping); err != nil {
+				log.Printf("keepalive ping error for client %s: %v", c.ID, err)
 				return
 			}
 		case <-ctx.Done():
@@ -210,6 +221,17 @@ func (h *Hub) UnregisterCam(clientID string) {
 	h.mu.Lock()
 	delete(h.camStates, clientID)
 	h.mu.Unlock()
+}
+
+// GetCamStates returns all currently active cameras.
+func (h *Hub) GetCamStates() []CamInfo {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	states := make([]CamInfo, 0, len(h.camStates))
+	for _, info := range h.camStates {
+		states = append(states, info)
+	}
+	return states
 }
 
 // SendToPeer routes a message to a specific peer by peer ID ("admin" or playerID).

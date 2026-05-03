@@ -44,6 +44,17 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.hub.Register(c)
+
+	// Push current state immediately so clients don't need a page reload after reconnect.
+	if isAdmin {
+		for _, room := range h.manager.ListRooms() {
+			c.Send(buildGameState(room))
+		}
+	}
+	if cams := h.hub.GetCamStates(); len(cams) > 0 {
+		c.Send(OutgoingMessage{Type: MsgCamState, Payload: map[string]any{"cams": cams}})
+	}
+
 	defer func() {
 		// If camera was active, notify peers before unregistering.
 		if c.CamOn {
@@ -160,6 +171,9 @@ func (h *Handler) handleCamOff(c *Client) {
 		Type:    MsgCamOff,
 		Payload: map[string]any{"from": peerID},
 	})
+	// Send updated cam list to the turning-off client so it can reconnect as receive-only.
+	cams := h.hub.GetCamStates()
+	c.Send(OutgoingMessage{Type: MsgCamState, Payload: map[string]any{"cams": cams}})
 }
 
 func (h *Handler) handleJoinGame(c *Client, payload map[string]any) {
