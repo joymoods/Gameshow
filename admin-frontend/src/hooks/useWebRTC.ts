@@ -12,16 +12,16 @@ export function useWebRTC(myPeerID: string, myName: string) {
 
   const myStreamRef = useRef<MediaStream | null>(null);
   const pcsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
-  // Track current camEnabled in a ref so effect callbacks stay up-to-date.
   const camEnabledRef = useRef(false);
   camEnabledRef.current = camEnabled;
-  // Same for myPeerID (stable once logged in, but defensive).
   const myPeerIDRef = useRef(myPeerID);
   myPeerIDRef.current = myPeerID;
+  // Per-peer flag to prevent concurrent offer attempts.
+  const makingOfferRef = useRef<Set<string>>(new Set());
 
   const getOrCreatePC = useCallback((peerID: string): RTCPeerConnection => {
     const existing = pcsRef.current.get(peerID);
-    if (existing) return existing;
+    if (existing && existing.signalingState !== 'closed') return existing;
 
     const pc = new RTCPeerConnection();
     pcsRef.current.set(peerID, pc);
@@ -42,14 +42,17 @@ export function useWebRTC(myPeerID: string, myName: string) {
       });
     };
 
+    // Only offer when stable and not already mid-offer — avoids double-offer on track addition.
     pc.onnegotiationneeded = async () => {
-      const me = myPeerIDRef.current;
-      if (!me || me >= peerID) return; // only the smaller ID initiates
+      if (pc.signalingState !== 'stable' || makingOfferRef.current.has(peerID)) return;
+      makingOfferRef.current.add(peerID);
       try {
         await pc.setLocalDescription();
         send('WEBRTC_OFFER', { to: peerID, sdp: pc.localDescription });
       } catch (e) {
         console.error('onnegotiationneeded error', e);
+      } finally {
+        makingOfferRef.current.delete(peerID);
       }
     };
 
@@ -64,7 +67,7 @@ export function useWebRTC(myPeerID: string, myName: string) {
       }
     };
 
-    // Add own tracks if camera is already on
+    // Add own tracks if camera is already on when PC is created.
     if (myStreamRef.current) {
       myStreamRef.current.getTracks().forEach((t) => pc.addTrack(t, myStreamRef.current!));
     }
@@ -78,6 +81,7 @@ export function useWebRTC(myPeerID: string, myName: string) {
       pc.close();
       pcsRef.current.delete(peerID);
     }
+    makingOfferRef.current.delete(peerID);
     setActiveCams((prev) => {
       const next = new Map(prev);
       next.delete(peerID);
@@ -85,32 +89,41 @@ export function useWebRTC(myPeerID: string, myName: string) {
     });
   }, []);
 
-  const connectToPeer = useCallback((peerID: string, peerName: string) => {
+  // Connect to a peer who has their camera on.
+  // initiator=true: I send the offer by adding tracks or a recvonly transceiver.
+  // initiator=false: I just prepare a PC and wait for their offer.
+  const connectToPeer = useCallback((peerID: string, peerName: string, initiator: boolean) => {
     const me = myPeerIDRef.current;
+    if (!me || me === peerID) return;
+
     setActiveCams((prev) => {
       const next = new Map(prev);
       if (!next.has(peerID)) next.set(peerID, { name: peerName, stream: null });
       return next;
     });
-    if (!me || !camEnabledRef.current) return;
-    if (me < peerID) {
-      // I'm the initiator — add tracks to trigger onnegotiationneeded
-      const pc = getOrCreatePC(peerID);
-      if (myStreamRef.current) {
-        const senders = pc.getSenders();
-        myStreamRef.current.getTracks().forEach((t) => {
-          if (!senders.find((s) => s.track === t)) {
-            pc.addTrack(t, myStreamRef.current!);
-          }
-        });
-      }
+
+    const pc = getOrCreatePC(peerID);
+    if (!initiator) return;
+
+    if (myStreamRef.current) {
+      // Add camera tracks to trigger onnegotiationneeded → offer.
+      const senders = pc.getSenders();
+      myStreamRef.current.getTracks().forEach((t) => {
+        if (!senders.find((s) => s.track === t)) {
+          pc.addTrack(t, myStreamRef.current!);
+        }
+      });
     } else {
-      // They initiate — just create the PC so we're ready for their offer
-      getOrCreatePC(peerID);
+      // No camera but want to receive: recvonly transceiver triggers onnegotiationneeded.
+      const hasVideo = pc.getTransceivers().some(
+        (t) => t.receiver.track?.kind === 'video' || t.sender.track?.kind === 'video'
+      );
+      if (!hasVideo) {
+        pc.addTransceiver('video', { direction: 'recvonly' });
+      }
     }
   }, [getOrCreatePC]);
 
-  // Handle all incoming WebSocket messages related to WebRTC
   useEffect(() => {
     return addMessageListener(async (msg) => {
       const p = msg.payload as Record<string, unknown>;
@@ -119,14 +132,20 @@ export function useWebRTC(myPeerID: string, myName: string) {
         const from = p.from as string;
         const name = (p.name as string) || from;
         if (from === myPeerIDRef.current) return;
-        connectToPeer(from, name);
+        // They are new and will offer to cam-ON peers (via their CAM_STATE).
+        // If I also have camera: use ID comparison to avoid glare.
+        // If I have no camera: I must initiate since they won't offer to cam-OFF clients.
+        const me = myPeerIDRef.current;
+        const initiator = camEnabledRef.current ? me < from : true;
+        connectToPeer(from, name, initiator);
       }
 
       if (msg.type === 'CAM_STATE') {
+        // Received on connect or after own CAM_OFF: I am the reconnecting side, I initiate.
         const cams = (p.cams as Array<{ from: string; name: string }>) ?? [];
         for (const { from, name } of cams) {
           if (from === myPeerIDRef.current) continue;
-          connectToPeer(from, name);
+          connectToPeer(from, name, true);
         }
       }
 
@@ -139,7 +158,6 @@ export function useWebRTC(myPeerID: string, myName: string) {
         const from = p.from as string;
         const sdp = p.sdp as RTCSessionDescriptionInit;
         const pc = getOrCreatePC(from);
-        // Add own tracks before answering if not yet added
         if (myStreamRef.current) {
           const senders = pc.getSenders();
           myStreamRef.current.getTracks().forEach((t) => {
@@ -181,10 +199,13 @@ export function useWebRTC(myPeerID: string, myName: string) {
       myStreamRef.current?.getTracks().forEach((t) => t.stop());
       myStreamRef.current = null;
       setCamEnabled(false);
-      // Remove tracks from all PCs
-      for (const pc of pcsRef.current.values()) {
-        pc.getSenders().forEach((s) => pc.removeTrack(s));
-      }
+      // Close all PCs before sending CAM_OFF — prevents onnegotiationneeded race
+      // (removeTrack would trigger renegotiation that disrupts other cameras).
+      // Server sends updated CAM_STATE after receiving CAM_OFF so we can reconnect.
+      for (const pc of pcsRef.current.values()) pc.close();
+      pcsRef.current.clear();
+      makingOfferRef.current.clear();
+      setActiveCams(new Map());
       send('CAM_OFF', {});
     } else {
       if (!myPeerIDRef.current) {
@@ -195,18 +216,15 @@ export function useWebRTC(myPeerID: string, myName: string) {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
         myStreamRef.current = stream;
         setCamEnabled(true);
-        // Add tracks to all existing PCs
-        for (const pc of pcsRef.current.values()) {
-          stream.getTracks().forEach((t) => pc.addTrack(t, stream));
-        }
         send('CAM_ON', { name: myName });
+        // Server responds with CAM_STATE showing existing cameras.
+        // CAM_STATE handler will call connectToPeer for each existing cam.
       } catch {
         alert('Kamera-Zugriff verweigert. HTTPS wird benötigt (außer auf localhost).');
       }
     }
   }, [myName]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       myStreamRef.current?.getTracks().forEach((t) => t.stop());
