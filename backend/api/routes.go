@@ -171,6 +171,8 @@ func (ro *Router) handleRoomRoutes(w http.ResponseWriter, r *http.Request) {
 			ro.handleRevealAnswer(w, r, room)
 		case rest == "end-buzzer":
 			ro.handleEndBuzzerPhase(w, r, room)
+		case rest == "timer":
+			ro.handleQuestionTimer(w, r, room)
 		default:
 			writeError(w, http.StatusNotFound, "not found")
 		}
@@ -459,6 +461,44 @@ func (ro *Router) handleDeleteRoom(w http.ResponseWriter, _ *http.Request, code 
 	ro.wsHandler.ResetRoomPlayers(code)
 	ro.manager.DeleteRoom(code)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "closed"})
+}
+
+// POST /api/rooms/:code/question/timer
+// Body: {"seconds": 30} starts timer; {"seconds": 0} stops it.
+func (ro *Router) handleQuestionTimer(w http.ResponseWriter, r *http.Request, room *core.Room) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if room.Game == nil {
+		writeError(w, http.StatusBadRequest, "no game initialised")
+		return
+	}
+	var body struct {
+		Seconds int `json:"seconds"`
+	}
+	json.NewDecoder(r.Body).Decode(&body) //nolint:errcheck
+
+	if body.Seconds <= 0 {
+		if _, err := room.Game.HandleAdminCommand("stop_timer", map[string]any{}); err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		ro.wsHandler.BroadcastTimerStopped()
+		writeJSON(w, http.StatusOK, map[string]string{"status": "stopped"})
+		return
+	}
+
+	result, err := room.Game.HandleAdminCommand("start_timer", map[string]any{"seconds": float64(body.Seconds)})
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	res := result.(map[string]any)
+	endsAt := res["endsAt"].(int64)
+	durationMs := res["durationMs"].(int64)
+	ro.wsHandler.BroadcastTimer(endsAt, durationMs)
+	writeJSON(w, http.StatusOK, map[string]any{"endsAt": endsAt, "durationMs": durationMs})
 }
 
 // POST /api/rooms/:code/question/end-buzzer

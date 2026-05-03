@@ -88,6 +88,10 @@ const (
 	// Server → All clients (game type changed in lobby)
 	MsgGameSwitched = "GAME_SWITCHED"
 
+	// Timer
+	MsgTimerStarted = "TIMER_STARTED"
+	MsgTimerStopped = "TIMER_STOPPED"
+
 	// WebRTC signaling — relayed between peers
 	MsgWebRTCOffer  = "WEBRTC_OFFER"
 	MsgWebRTCAnswer = "WEBRTC_ANSWER"

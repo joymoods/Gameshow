@@ -1200,3 +1200,78 @@ input:focus, textarea:focus, select:focus { border-color: var(--primary); }
 .cam-toggle-btn.cam-off { background: var(--surface2); }
 .cam-toggle-btn.cam-on  { background: rgba(79,110,247,0.2); border: 2px solid var(--primary); }
 .cam-toggle-btn:hover   { transform: scale(1.1); }
+
+/* ---- Timer controls (admin) ---- */
+.timer-control {
+  margin: 8px 0 6px;
+  padding: 8px 10px;
+  background: rgba(240,180,41,0.06);
+  border: 1px solid rgba(240,180,41,0.18);
+  border-radius: 8px;
+}
+.timer-presets {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.timer-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.timer-preset-btn {
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(240,180,41,0.35);
+  background: rgba(240,180,41,0.08);
+  color: var(--gold);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.timer-preset-btn:hover { background: rgba(240,180,41,0.22); }
+.timer-running {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.timer-running-icon { font-size: 14px; }
+.timer-running-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gold);
+  min-width: 36px;
+  transition: color 0.3s;
+}
+.timer-running-value.timer-urgent { color: #ff4d4d; animation: pulse 0.5s ease infinite alternate; }
+.timer-stop-btn {
+  padding: 2px 8px;
+  border-radius: 5px;
+  border: 1px solid rgba(255,77,77,0.4);
+  background: rgba(255,77,77,0.1);
+  color: #ff4d4d;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.timer-stop-btn:hover { background: rgba(255,77,77,0.25); }
+.timer-bar-track {
+  flex: 1;
+  min-width: 60px;
+  height: 5px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.timer-bar-fill {
+  height: 100%;
+  background: var(--gold);
+  border-radius: 3px;
+  transition: width 0.5s linear, background 0.3s;
+}
+@keyframes pulse {
+  from { opacity: 1; }
+  to   { opacity: 0.5; }
+}

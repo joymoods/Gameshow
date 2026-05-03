@@ -55,12 +55,25 @@ export default function JeopardyGame() {
     revealedAnswer,
     lastAnswerResult,
     gameType,
+    timerEndsAt, timerDurMs,
   } = useGameStore();
   const gameLogo = getGameLogo(gameType);
   const { camEnabled, activeCams, myStream, toggleCam } = useWebRTC(myPlayerId, myPlayerName);
 
   const [deltas, setDeltas] = useState<Record<string, ScoreDelta>>({});
   const prevScores = useRef<Record<string, number>>({});
+
+  const [timerRemaining, setTimerRemaining] = useState<number | null>(null);
+  useEffect(() => {
+    if (!timerEndsAt) { setTimerRemaining(null); return; }
+    const tick = () => {
+      const rem = Math.max(0, Math.round((timerEndsAt - Date.now()) / 1000));
+      setTimerRemaining(rem);
+    };
+    tick();
+    const id = setInterval(tick, 500);
+    return () => clearInterval(id);
+  }, [timerEndsAt]);
 
   type AnswerFeedback = 'correct' | 'wrong' | 'correct-stay' | null;
   const [answerFeedback, setAnswerFeedback] = useState<AnswerFeedback>(null);
@@ -322,6 +335,20 @@ export default function JeopardyGame() {
                   <video src={mediaUrl(currentQuestion!.videoUrl)} controls autoPlay style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 8 }} />
                 )}
               </div>
+
+              {timerRemaining !== null && timerDurMs && (
+                <div className="overlay-timer">
+                  <div className="overlay-timer-bar-track">
+                    <div
+                      className={`overlay-timer-bar-fill ${timerRemaining <= 5 ? 'overlay-timer-urgent' : ''}`}
+                      style={{ width: `${Math.max(0, (timerRemaining / (timerDurMs / 1000)) * 100)}%` }}
+                    />
+                  </div>
+                  <span className={`overlay-timer-value ${timerRemaining <= 5 ? 'overlay-timer-urgent' : ''}`}>
+                    {timerRemaining}
+                  </span>
+                </div>
+              )}
 
               <div className="overlay-divider" />
 

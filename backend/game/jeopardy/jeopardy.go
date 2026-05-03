@@ -3,6 +3,7 @@ package jeopardy
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"games/game/core"
 )
@@ -19,6 +20,9 @@ type JeopardyGame struct {
 	currentQuestion *core.Question
 	buzzedPlayerID  string
 	buzzedPlayers   map[string]bool
+
+	timerEndsAt int64 // Unix ms; 0 = no active timer
+	timerDurMs  int64
 }
 
 func New() *JeopardyGame {
@@ -55,6 +59,8 @@ func (j *JeopardyGame) Snapshot() map[string]any {
 		"current_phase":    string(j.phase),
 		"current_question": currentQ,
 		"buzzed_player_id": j.buzzedPlayerID,
+		"timer_ends_at":    j.timerEndsAt,
+		"timer_dur_ms":     j.timerDurMs,
 	}
 }
 
@@ -83,6 +89,10 @@ func (j *JeopardyGame) HandleAdminCommand(cmd string, payload map[string]any) (a
 		return j.reveal()
 	case "end_buzzer":
 		return j.endBuzzer()
+	case "start_timer":
+		return j.startTimer(payload)
+	case "stop_timer":
+		return j.stopTimer()
 	default:
 		return nil, fmt.Errorf("unknown command: %s", cmd)
 	}
@@ -160,6 +170,8 @@ func (j *JeopardyGame) openQuestion(payload map[string]any) (any, error) {
 	j.phase = PhaseActivePlayerAnswering
 	j.buzzedPlayers = make(map[string]bool)
 	j.buzzedPlayerID = ""
+	j.timerEndsAt = 0
+	j.timerDurMs = 0
 
 	var activePlayer *core.Player
 	if j.room != nil {
@@ -239,6 +251,8 @@ func (j *JeopardyGame) closeQuestion() (any, error) {
 	j.currentQuestion = nil
 	j.buzzedPlayers = make(map[string]bool)
 	j.buzzedPlayerID = ""
+	j.timerEndsAt = 0
+	j.timerDurMs = 0
 
 	gameOver := j.allQuestionsPlayed()
 	var activePlayer *core.Player
@@ -334,4 +348,22 @@ func (j *JeopardyGame) hasRemainingBuzzers() bool {
 		}
 	}
 	return false
+}
+
+func (j *JeopardyGame) startTimer(payload map[string]any) (any, error) {
+	seconds, _ := payload["seconds"].(float64)
+	if seconds <= 0 {
+		return nil, fmt.Errorf("invalid timer duration")
+	}
+	durMs := int64(seconds) * 1000
+	endsAt := time.Now().UnixMilli() + durMs
+	j.timerEndsAt = endsAt
+	j.timerDurMs = durMs
+	return map[string]any{"endsAt": endsAt, "durationMs": durMs}, nil
+}
+
+func (j *JeopardyGame) stopTimer() (any, error) {
+	j.timerEndsAt = 0
+	j.timerDurMs = 0
+	return map[string]any{"status": "stopped"}, nil
 }

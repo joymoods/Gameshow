@@ -47,6 +47,10 @@ interface GameState {
   buzzedPlayerName: string | null;
   finalScores: Player[];
 
+  // Timer
+  timerEndsAt: number | null;
+  timerDurMs: number | null;
+
   // Actions
   setConnected: (v: boolean) => void;
   handleMessage: (msg: WsMessage) => void;
@@ -70,6 +74,8 @@ export const useGameStore = create<GameState>((set) => ({
   buzzedPlayerId: null,
   buzzedPlayerName: null,
   finalScores: [],
+  timerEndsAt: null,
+  timerDurMs: null,
 
   setConnected: (connected) => set({ connected }),
 
@@ -89,6 +95,8 @@ export const useGameStore = create<GameState>((set) => ({
     buzzedPlayerId: null,
     buzzedPlayerName: null,
     finalScores: [],
+    timerEndsAt: null,
+    timerDurMs: null,
   }),
 
   handleMessage: (msg) => {
@@ -106,6 +114,8 @@ export const useGameStore = create<GameState>((set) => ({
           game_state?: {
             current_question?: { id: string; points: number; text: string; answer?: string; imageUrl?: string; audioUrl?: string; videoUrl?: string };
             buzzed_player_id?: string;
+            timer_ends_at?: number;
+            timer_dur_ms?: number;
           };
         };
         const allPlayers = p.scores ?? [];
@@ -127,6 +137,9 @@ export const useGameStore = create<GameState>((set) => ({
           currentQuestion = { questionId: cq.id, category: catName, points: cq.points, text: cq.text, answer: cq.answer, imageUrl: cq.imageUrl, audioUrl: cq.audioUrl, videoUrl: cq.videoUrl };
         }
 
+        const timerEndsAt = p.game_state?.timer_ends_at ?? null;
+        const timerDurMs = p.game_state?.timer_dur_ms ?? null;
+
         set({
           roomCode: p.roomCode,
           board,
@@ -140,6 +153,8 @@ export const useGameStore = create<GameState>((set) => ({
           buzzedPlayerId: buzzedId,
           buzzedPlayerName: buzzedName,
           currentQuestion,
+          timerEndsAt: timerEndsAt ? Number(timerEndsAt) : null,
+          timerDurMs: timerDurMs ? Number(timerDurMs) : null,
         });
         break;
       }
@@ -238,6 +253,17 @@ export const useGameStore = create<GameState>((set) => ({
             pl.id === p.playerId ? { ...pl, connected: false } : pl
           ),
         }));
+        break;
+      }
+
+      case MSG.TIMER_STARTED: {
+        const p = msg.payload as { endsAt: number; durationMs: number };
+        set({ timerEndsAt: p.endsAt, timerDurMs: p.durationMs });
+        break;
+      }
+
+      case MSG.TIMER_STOPPED: {
+        set({ timerEndsAt: null, timerDurMs: null });
         break;
       }
 

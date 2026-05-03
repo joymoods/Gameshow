@@ -191,7 +191,11 @@ func (h *Handler) handleJoinGame(c *Client, payload map[string]any) {
 		return
 	}
 
-	player, isNew := room.AddPlayer(playerName)
+	player, isNew, err := room.AddPlayer(playerName)
+	if err != nil {
+		c.Send(OutgoingMessage{Type: MsgError, Payload: ErrorPayload{Message: "name already taken"}})
+		return
+	}
 	c.PlayerID = player.ID
 	c.RoomCode = room.Code
 
@@ -369,4 +373,15 @@ func (h *Handler) BroadcastGameSwitched(gameType string) {
 		Type:    MsgGameSwitched,
 		Payload: GameSwitchedPayload{GameType: gameType},
 	})
+}
+
+func (h *Handler) BroadcastTimer(endsAt, durationMs int64) {
+	h.hub.Broadcast(OutgoingMessage{
+		Type:    MsgTimerStarted,
+		Payload: map[string]any{"endsAt": endsAt, "durationMs": durationMs},
+	})
+}
+
+func (h *Handler) BroadcastTimerStopped() {
+	h.hub.Broadcast(OutgoingMessage{Type: MsgTimerStopped, Payload: nil})
 }

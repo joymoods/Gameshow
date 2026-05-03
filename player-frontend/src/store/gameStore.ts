@@ -59,12 +59,20 @@ interface GameState {
   // Player was kicked by admin
   kicked: boolean;
 
+  // Join failed (e.g. name already taken)
+  joinError: string | null;
+
+  // Timer
+  timerEndsAt: number | null;
+  timerDurMs: number | null;
+
   // Actions
   setConnected: (v: boolean) => void;
   setIdentity: (id: string, name: string) => void;
   handleMessage: (msg: WsMessage) => void;
   clearRoomReset: () => void;
   clearKicked: () => void;
+  clearJoinError: () => void;
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -90,6 +98,9 @@ export const useGameStore = create<GameState>((set, get) => ({
   lastAnswerResult: null,
   roomReset: false,
   kicked: false,
+  joinError: null,
+  timerEndsAt: null,
+  timerDurMs: null,
 
   setConnected: (connected) => set({ connected }),
 
@@ -97,6 +108,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   clearRoomReset: () => set({ roomReset: false }),
   clearKicked: () => set({ kicked: false }),
+  clearJoinError: () => set({ joinError: null }),
 
   handleMessage: (msg) => {
     switch (msg.type) {
@@ -109,6 +121,7 @@ export const useGameStore = create<GameState>((set, get) => ({
           currentPhase: GamePhase;
           game_type?: GameType | string;
           room_phase?: RoomPhase | string;
+          game_state?: { timer_ends_at?: number; timer_dur_ms?: number };
         };
         set((state) => {
           // Resolve own player ID by matching name — only needed once after join
@@ -119,6 +132,8 @@ export const useGameStore = create<GameState>((set, get) => ({
             );
             if (me) myPlayerId = me.id;
           }
+          const timerEndsAt = p.game_state?.timer_ends_at ?? null;
+          const timerDurMs = p.game_state?.timer_dur_ms ?? null;
           return {
             roomCode: p.roomCode,
             board: p.board,
@@ -128,6 +143,8 @@ export const useGameStore = create<GameState>((set, get) => ({
             gameType: (p.game_type as GameType) ?? null,
             roomPhase: (p.room_phase as RoomPhase) ?? null,
             myPlayerId,
+            timerEndsAt: timerEndsAt ? Number(timerEndsAt) : null,
+            timerDurMs: timerDurMs ? Number(timerDurMs) : null,
           };
         });
         break;
@@ -143,6 +160,8 @@ export const useGameStore = create<GameState>((set, get) => ({
           buzzedPlayerName: null,
           revealedAnswer: null,
           lastAnswerResult: null,
+          timerEndsAt: null,
+          timerDurMs: null,
         });
         break;
       }
@@ -213,6 +232,8 @@ export const useGameStore = create<GameState>((set, get) => ({
           buzzerOpen: false,
           hasBuzzed: false,
           revealedAnswer: null,
+          timerEndsAt: null,
+          timerDurMs: null,
         }));
         break;
       }
@@ -226,6 +247,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       case MSG.ERROR: {
         const p = msg.payload as { message: string };
         console.error('WS Error:', p.message);
+        if (!get().myPlayerId) {
+          set({ joinError: p.message });
+        }
         break;
       }
 
@@ -245,6 +269,17 @@ export const useGameStore = create<GameState>((set, get) => ({
           buzzedPlayerId: null, buzzedPlayerName: null, finalScores: [],
           myPlayerId: '', myPlayerName: '',
         });
+        break;
+      }
+
+      case MSG.TIMER_STARTED: {
+        const p = msg.payload as { endsAt: number; durationMs: number };
+        set({ timerEndsAt: p.endsAt, timerDurMs: p.durationMs });
+        break;
+      }
+
+      case MSG.TIMER_STOPPED: {
+        set({ timerEndsAt: null, timerDurMs: null });
         break;
       }
 

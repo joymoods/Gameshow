@@ -118,6 +118,7 @@ export default function ControlPage({ toast }: Props) {
     currentQuestion, phase, roomPhase,
     buzzedPlayerId, buzzedPlayerName,
     finalScores, resetGameState, handleMessage,
+    timerEndsAt, timerDurMs,
   } = useGameStore();
   // Prefer URL param so the page works when navigated directly
   const roomCode = urlCode ?? storeRoomCode;
@@ -128,6 +129,19 @@ export default function ControlPage({ toast }: Props) {
   const [showAnswer, setShowAnswer] = useState(false);
   const [answerBroadcast, setAnswerBroadcast] = useState(false);
   const [deltas, setDeltas] = useState<Record<string, ScoreDelta>>({});
+
+  // Timer countdown (seconds remaining, recomputed from timerEndsAt every second)
+  const [timerRemaining, setTimerRemaining] = useState<number | null>(null);
+  useEffect(() => {
+    if (!timerEndsAt) { setTimerRemaining(null); return; }
+    const tick = () => {
+      const rem = Math.max(0, Math.round((timerEndsAt - Date.now()) / 1000));
+      setTimerRemaining(rem);
+    };
+    tick();
+    const id = setInterval(tick, 500);
+    return () => clearInterval(id);
+  }, [timerEndsAt]);
 
   const orderedPlayers = playerOrder
     .map((id) => players.find((p) => p.id === id))
@@ -166,6 +180,14 @@ export default function ControlPage({ toast }: Props) {
   async function endBuzzerPhase() {
     await fetch(`${API}/api/rooms/${roomCode}/question/end-buzzer`, { method: 'POST' });
     toast('Buzzer-Phase beendet', 'warning');
+  }
+
+  async function startTimer(seconds: number) {
+    await fetch(`${API}/api/rooms/${roomCode}/question/timer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ seconds }),
+    });
   }
 
   async function judgeAnswer(correct: boolean) {
@@ -338,6 +360,39 @@ export default function ControlPage({ toast }: Props) {
               {currentQuestion.imageUrl && <img src={currentQuestion.imageUrl} alt="" className="q-media" />}
               {currentQuestion.audioUrl && <audio src={currentQuestion.audioUrl} controls className="q-media" />}
               {currentQuestion.videoUrl && <video src={currentQuestion.videoUrl} controls className="q-media" />}
+              {/* Timer controls */}
+              <div className="timer-control">
+                {timerRemaining !== null ? (
+                  <div className="timer-running">
+                    <span className="timer-running-icon">⏱</span>
+                    <span className={`timer-running-value ${timerRemaining <= 5 ? 'timer-urgent' : ''}`}>
+                      {timerRemaining}s
+                    </span>
+                    <button className="timer-stop-btn" onClick={() => startTimer(0)}>Stopp</button>
+                    {timerDurMs && (
+                      <div
+                        className="timer-bar-track"
+                        title={`${timerRemaining}s verbleibend`}
+                      >
+                        <div
+                          className="timer-bar-fill"
+                          style={{ width: `${Math.max(0, (timerRemaining / (timerDurMs / 1000)) * 100)}%` }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="timer-presets">
+                    <span className="timer-label">⏱ Timer:</span>
+                    {[15, 30, 60].map((s) => (
+                      <button key={s} className="timer-preset-btn" onClick={() => startTimer(s)}>
+                        {s}s
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {/* Answer reveal */}
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10, marginTop: 2 }}>
                 <button className="q-answer-toggle" onClick={() => setShowAnswer((s) => !s)}>
