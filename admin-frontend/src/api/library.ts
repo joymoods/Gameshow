@@ -1,10 +1,9 @@
 import type { QuizSummary, QuizDetail } from '../types/library';
 import type { Category } from '../types';
-
-const API = import.meta.env.VITE_API_URL ?? `${window.location.protocol}//${window.location.hostname}`;
+import { API, apiFetch } from './client';
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(url, options);
+  const res = await apiFetch(url, options);
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);

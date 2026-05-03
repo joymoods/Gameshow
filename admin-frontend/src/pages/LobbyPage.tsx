@@ -4,8 +4,7 @@ import { useGameStore } from '../store/gameStore';
 import { useLobbyStore } from '../store/lobbyStore';
 import type { ToastType } from '../App';
 import BoardPreview from '../components/BoardPreview';
-
-const API = import.meta.env.VITE_API_URL ?? `${window.location.protocol}//${window.location.hostname}`;
+import { API, apiFetch } from '../api/client';
 
 interface Props {
   toast: (msg: string, type?: ToastType) => void;
@@ -26,7 +25,7 @@ export default function LobbyPage({ toast }: Props) {
     setActiveRoom(code);
 
     async function loadRoom() {
-      const res = await fetch(`${API}/api/rooms/${code}`);
+      const res = await apiFetch(`${API}/api/rooms/${code}`);
       if (!res.ok) {
         toast('Room nicht gefunden', 'error');
         navigate('/');
@@ -63,13 +62,13 @@ export default function LobbyPage({ toast }: Props) {
   }
 
   async function shuffle() {
-    await fetch(`${API}/api/rooms/${code}/players/shuffle`, { method: 'POST' });
+    await apiFetch(`${API}/api/rooms/${code}/players/shuffle`, { method: 'POST' });
   }
 
   async function kickPlayer(playerId: string, playerName: string) {
     if (!confirm(`"${playerName}" wirklich kicken?`)) return;
     try {
-      const res = await fetch(`${API}/api/rooms/${code}/players/${playerId}`, { method: 'DELETE' });
+      const res = await apiFetch(`${API}/api/rooms/${code}/players/${playerId}`, { method: 'DELETE' });
       if (!res.ok) {
         const data = await res.json();
         toast(data.error || 'Kick fehlgeschlagen', 'error');
@@ -95,7 +94,7 @@ export default function LobbyPage({ toast }: Props) {
 
   async function onDragEnd() {
     setDragIndex(null);
-    await fetch(`${API}/api/rooms/${code}/players/order`, {
+    await apiFetch(`${API}/api/rooms/${code}/players/order`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(playerOrder),
@@ -106,7 +105,7 @@ export default function LobbyPage({ toast }: Props) {
     if (connectedPlayers.length === 0) return;
     setStarting(true);
     try {
-      const res = await fetch(`${API}/api/rooms/${code}/start`, { method: 'POST' });
+      const res = await apiFetch(`${API}/api/rooms/${code}/start`, { method: 'POST' });
       if (!res.ok) {
         const data = await res.json();
         toast(data.error || 'Fehler beim Starten', 'error');

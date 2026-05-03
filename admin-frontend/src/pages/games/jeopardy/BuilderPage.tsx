@@ -3,12 +3,11 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import { useGameStore } from '../../../store/gameStore';
 import { useLobbyStore } from '../../../store/lobbyStore';
-import { getQuiz, updateQuiz } from '../../../api/library';
+import { getQuiz, updateQuiz, saveQuiz } from '../../../api/library';
 import type { Category, Question } from '../../../types';
 import type { ToastType } from '../../../App';
 import BoardPreview from '../../../components/BoardPreview';
-
-const API = import.meta.env.VITE_API_URL ?? `${window.location.protocol}//${window.location.hostname}`;
+import { API, apiFetch } from '../../../api/client';
 
 function emptyQuestion(categoryId: string): Question {
   return { id: uuidv4(), categoryId, points: 200, text: '', answer: '', played: false };
@@ -31,7 +30,7 @@ function QuestionEditor({ question, onChange, onDelete }: QuestionEditorProps) {
     try {
       const form = new FormData();
       form.append('file', file);
-      const res = await fetch(`${API}/api/media/upload`, { method: 'POST', body: form });
+      const res = await apiFetch(`${API}/api/media/upload`, { method: 'POST', body: form });
       if (!res.ok) throw new Error('Upload fehlgeschlagen');
       const data = await res.json();
       onChange({ ...question, [field]: `${API}${data.url}` });
@@ -130,6 +129,9 @@ export default function BuilderPage({ toast }: Props) {
   const [editingQuizName, setEditingQuizName] = useState('');
   const [editingQuizDesc, setEditingQuizDesc] = useState('');
   const [savingToLibrary, setSavingToLibrary] = useState(false);
+  const [saveModal, setSaveModal] = useState(false);
+  const [saveModalName, setSaveModalName] = useState('');
+  const [saveModalDesc, setSaveModalDesc] = useState('');
 
   useEffect(() => {
     const quizId = searchParams.get('quizId');
@@ -251,7 +253,7 @@ export default function BuilderPage({ toast }: Props) {
       return;
     }
     try {
-      const res = await fetch(`${API}/api/rooms/${activeRoomCode}/quiz`, {
+      const res = await apiFetch(`${API}/api/rooms/${activeRoomCode}/quiz`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(builderCategories),
@@ -269,6 +271,23 @@ export default function BuilderPage({ toast }: Props) {
     try {
       await updateQuiz(editingQuizId, editingQuizName, editingQuizDesc, builderCategories);
       toast('In Bibliothek gespeichert', 'success');
+    } catch (e) {
+      toast(String(e), 'error');
+    } finally {
+      setSavingToLibrary(false);
+    }
+  }
+
+  async function saveNewToLibrary() {
+    if (!saveModalName.trim() || builderCategories.length === 0) return;
+    setSavingToLibrary(true);
+    try {
+      const summary = await saveQuiz(saveModalName.trim(), saveModalDesc.trim(), 'jeopardy', builderCategories);
+      setEditingQuizId(summary.id);
+      setEditingQuizName(summary.name);
+      setEditingQuizDesc(summary.description ?? '');
+      setSaveModal(false);
+      toast(`"${summary.name}" in Bibliothek gespeichert`, 'success');
     } catch (e) {
       toast(String(e), 'error');
     } finally {
@@ -314,7 +333,14 @@ export default function BuilderPage({ toast }: Props) {
                 </button>
                 <input ref={importRef} type="file" accept=".json" style={{ display: 'none' }} onChange={importQuiz} />
                 <button className="btn-secondary btn-sm" onClick={exportQuiz} disabled={builderCategories.length === 0}>
-                  💾 Export
+                  Export
+                </button>
+                <button
+                  className="btn-primary btn-sm"
+                  onClick={() => { setSaveModalName(''); setSaveModalDesc(''); setSaveModal(true); }}
+                  disabled={builderCategories.length === 0}
+                >
+                  💾 In Bibliothek speichern
                 </button>
               </>
             )}
@@ -408,6 +434,43 @@ export default function BuilderPage({ toast }: Props) {
       <div className="builder-preview">
         <BoardPreview categories={builderCategories} />
       </div>
+
+      {/* Modal: Neues Quiz in Bibliothek speichern */}
+      {saveModal && (
+        <div className="modal-backdrop" onClick={() => setSaveModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2 className="modal-title">Quiz in Bibliothek speichern</h2>
+            <div className="form-group">
+              <label className="form-label">Name *</label>
+              <input
+                className="form-input"
+                type="text"
+                placeholder="Name des Quizzes"
+                value={saveModalName}
+                onChange={(e) => setSaveModalName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && saveNewToLibrary()}
+                autoFocus
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Beschreibung</label>
+              <input
+                className="form-input"
+                type="text"
+                placeholder="Optional"
+                value={saveModalDesc}
+                onChange={(e) => setSaveModalDesc(e.target.value)}
+              />
+            </div>
+            <div className="modal-actions">
+              <button className="btn-secondary" onClick={() => setSaveModal(false)}>Abbrechen</button>
+              <button className="btn-primary" onClick={saveNewToLibrary} disabled={!saveModalName.trim() || savingToLibrary}>
+                {savingToLibrary ? 'Speichert…' : '💾 Speichern'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

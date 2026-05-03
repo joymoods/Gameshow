@@ -9,6 +9,7 @@ import LibraryPage from './pages/LibraryPage';
 import PinPage from './pages/PinPage';
 import { useGameStore } from './store/gameStore';
 import { useLobbyStore } from './store/lobbyStore';
+import { API, apiFetch } from './api/client';
 import './App.css';
 
 // ---- Toast system ----
@@ -96,9 +97,7 @@ function ControlRoute({ toast }: { toast: (msg: string, type?: ToastType) => voi
 
   async function handleEndGame() {
     try {
-      await fetch(`${import.meta.env.VITE_API_URL ?? `${window.location.protocol}//${window.location.hostname}`}/api/rooms/${code}/end`, {
-        method: 'POST',
-      });
+      await apiFetch(`${API}/api/rooms/${code}/end`, { method: 'POST' });
     } catch { /* ignore */ }
     resetGameState();
     navigate('/');

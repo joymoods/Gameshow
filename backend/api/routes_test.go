@@ -14,8 +14,11 @@ import (
 
 // ---- test infrastructure ----
 
+const testAdminToken = "test-admin-token"
+
 func newTestServer(t *testing.T) (*httptest.Server, *core.Manager) {
 	t.Helper()
+	t.Setenv("ADMIN_TOKEN", testAdminToken)
 	manager := core.NewManager()
 	hub := ws.NewHub()
 	wsHandler := ws.NewHandler(hub, manager)
@@ -36,6 +39,20 @@ func jsonBody(t *testing.T, v any) *bytes.Reader {
 	return bytes.NewReader(b)
 }
 
+func doGet(t *testing.T, url string) *http.Response {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		t.Fatalf("NewRequest GET: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+testAdminToken)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("GET %s: %v", url, err)
+	}
+	return resp
+}
+
 func doPost(t *testing.T, url string, body any) *http.Response {
 	t.Helper()
 	var r *bytes.Reader
@@ -44,7 +61,28 @@ func doPost(t *testing.T, url string, body any) *http.Response {
 	} else {
 		r = bytes.NewReader(nil)
 	}
-	resp, err := http.Post(url, "application/json", r)
+	req, err := http.NewRequest(http.MethodPost, url, r)
+	if err != nil {
+		t.Fatalf("NewRequest POST: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+testAdminToken)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("POST %s: %v", url, err)
+	}
+	return resp
+}
+
+func doPostRaw(t *testing.T, url string, rawBody []byte) *http.Response {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(rawBody))
+	if err != nil {
+		t.Fatalf("NewRequest POST: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+testAdminToken)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("POST %s: %v", url, err)
 	}
@@ -57,6 +95,7 @@ func doDelete(t *testing.T, url string) *http.Response {
 	if err != nil {
 		t.Fatalf("NewRequest DELETE: %v", err)
 	}
+	req.Header.Set("Authorization", "Bearer "+testAdminToken)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("DELETE %s: %v", url, err)
@@ -102,10 +141,7 @@ func testCategories() []core.Category {
 func TestGetRooms_Empty(t *testing.T) {
 	srv, _ := newTestServer(t)
 
-	resp, err := http.Get(srv.URL + "/api/rooms")
-	if err != nil {
-		t.Fatal(err)
-	}
+	resp := doGet(t, srv.URL+"/api/rooms")
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected 200, got %d", resp.StatusCode)
 	}
@@ -121,7 +157,7 @@ func TestGetRooms_ListsRooms(t *testing.T) {
 	createRoom(t, srv)
 	createRoom(t, srv)
 
-	resp, _ := http.Get(srv.URL + "/api/rooms")
+	resp := doGet(t, srv.URL+"/api/rooms")
 	var rooms []any
 	decode(t, resp, &rooms)
 	if len(rooms) != 2 {
@@ -161,8 +197,7 @@ func TestCreateRoom_UnsupportedGameType(t *testing.T) {
 func TestCreateRoom_InvalidJSON(t *testing.T) {
 	srv, _ := newTestServer(t)
 
-	resp, _ := http.Post(srv.URL+"/api/rooms", "application/json",
-		bytes.NewReader([]byte("not-json")))
+	resp := doPostRaw(t, srv.URL+"/api/rooms", []byte("not-json"))
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("expected 400 for invalid JSON, got %d", resp.StatusCode)
 	}
@@ -174,7 +209,7 @@ func TestGetRoom_Found(t *testing.T) {
 	srv, _ := newTestServer(t)
 	code := createRoom(t, srv)
 
-	resp, _ := http.Get(srv.URL + "/api/rooms/" + code)
+	resp := doGet(t, srv.URL+"/api/rooms/"+code)
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected 200, got %d", resp.StatusCode)
 	}
@@ -191,7 +226,7 @@ func TestGetRoom_Found(t *testing.T) {
 func TestGetRoom_NotFound(t *testing.T) {
 	srv, _ := newTestServer(t)
 
-	resp, _ := http.Get(srv.URL + "/api/rooms/XXXXXX")
+	resp := doGet(t, srv.URL+"/api/rooms/XXXXXX")
 	if resp.StatusCode != http.StatusNotFound {
 		t.Errorf("expected 404, got %d", resp.StatusCode)
 	}
@@ -208,7 +243,7 @@ func TestDeleteRoom(t *testing.T) {
 		t.Errorf("expected 200, got %d", resp.StatusCode)
 	}
 
-	resp2, _ := http.Get(srv.URL + "/api/rooms/" + code)
+	resp2 := doGet(t, srv.URL+"/api/rooms/"+code)
 	if resp2.StatusCode != http.StatusNotFound {
 		t.Errorf("expected 404 after delete, got %d", resp2.StatusCode)
 	}
@@ -239,8 +274,7 @@ func TestUploadQuiz_InvalidJSON(t *testing.T) {
 	srv, _ := newTestServer(t)
 	code := createRoom(t, srv)
 
-	resp, _ := http.Post(srv.URL+"/api/rooms/"+code+"/quiz", "application/json",
-		bytes.NewReader([]byte("not-json")))
+	resp := doPostRaw(t, srv.URL+"/api/rooms/"+code+"/quiz", []byte("not-json"))
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", resp.StatusCode)
 	}
@@ -253,7 +287,7 @@ func TestExportQuiz(t *testing.T) {
 	code := createRoom(t, srv)
 	doPost(t, srv.URL+"/api/rooms/"+code+"/quiz", testCategories())
 
-	resp, _ := http.Get(srv.URL + "/api/rooms/" + code + "/export")
+	resp := doGet(t, srv.URL+"/api/rooms/"+code+"/export")
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected 200, got %d", resp.StatusCode)
 	}
@@ -271,7 +305,7 @@ func TestExportQuiz_Empty(t *testing.T) {
 	srv, _ := newTestServer(t)
 	code := createRoom(t, srv)
 
-	resp, _ := http.Get(srv.URL + "/api/rooms/" + code + "/export")
+	resp := doGet(t, srv.URL+"/api/rooms/"+code+"/export")
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected 200, got %d", resp.StatusCode)
 	}
@@ -419,8 +453,7 @@ func TestAnswer_InvalidJSON(t *testing.T) {
 	room.AddPlayer("Alice")
 	doPost(t, srv.URL+"/api/rooms/"+code+"/start", nil)
 
-	resp, _ := http.Post(srv.URL+"/api/rooms/"+code+"/answer", "application/json",
-		bytes.NewReader([]byte("not-json")))
+	resp := doPostRaw(t, srv.URL+"/api/rooms/"+code+"/answer", []byte("not-json"))
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", resp.StatusCode)
 	}
@@ -612,12 +645,29 @@ func TestSwitchGame_UnsupportedType(t *testing.T) {
 	}
 }
 
+// ---- auth rejection ----
+
+func TestRooms_UnauthenticatedReturns401(t *testing.T) {
+	srv, _ := newTestServer(t)
+
+	req, _ := http.NewRequest(http.MethodGet, srv.URL+"/api/rooms", nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected 401 for unauthenticated GET /api/rooms, got %d", resp.StatusCode)
+	}
+}
+
 // ---- CORS ----
 
 func TestCORSHeaders(t *testing.T) {
 	srv, _ := newTestServer(t)
 
-	resp, _ := http.Get(srv.URL + "/api/rooms")
+	// CORS headers are set by withCORS before auth runs, so they appear even on 401.
+	req, _ := http.NewRequest(http.MethodGet, srv.URL+"/api/rooms", nil)
+	resp, _ := http.DefaultClient.Do(req)
 	if resp.Header.Get("Access-Control-Allow-Origin") != "*" {
 		t.Error("expected CORS Access-Control-Allow-Origin: *")
 	}

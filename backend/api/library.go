@@ -22,6 +22,11 @@ func (ro *Router) handleLibraryCollection(w http.ResponseWriter, r *http.Request
 		writeJSON(w, http.StatusOK, summaries)
 
 	case http.MethodPost:
+		// Reject unauthenticated callers before any validation (P2, P4).
+		if !isAdmin(r) {
+			writeError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
 		var body struct {
 			Name        string          `json:"name"`
 			Description string          `json:"description"`
@@ -29,7 +34,7 @@ func (ro *Router) handleLibraryCollection(w http.ResponseWriter, r *http.Request
 			Categories  []core.Category `json:"categories"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+			writeError(w, http.StatusBadRequest, "invalid JSON")
 			return
 		}
 		if body.Name == "" {
@@ -56,11 +61,15 @@ func (ro *Router) handleLibraryRoutes(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/api/library/")
 	path = strings.TrimSuffix(path, "/")
 
-	// POST /api/library/from-room/:code
+	// POST /api/library/from-room/:code — admin only (P2)
 	if strings.HasPrefix(path, "from-room/") {
 		roomCode := strings.TrimPrefix(path, "from-room/")
 		if r.Method != http.MethodPost {
 			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+		if !isAdmin(r) {
+			writeError(w, http.StatusUnauthorized, "unauthorized")
 			return
 		}
 		ro.handleSaveRoomQuiz(w, r, roomCode)
@@ -88,13 +97,17 @@ func (ro *Router) handleLibraryRoutes(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, detail)
 
 	case http.MethodPut:
+		if !isAdmin(r) {
+			writeError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
 		var body struct {
 			Name        string          `json:"name"`
 			Description string          `json:"description"`
 			Categories  []core.Category `json:"categories"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+			writeError(w, http.StatusBadRequest, "invalid JSON")
 			return
 		}
 		if body.Name == "" {
@@ -113,6 +126,10 @@ func (ro *Router) handleLibraryRoutes(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, summary)
 
 	case http.MethodDelete:
+		if !isAdmin(r) {
+			writeError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
 		err := ro.quizStore.Delete(r.Context(), id)
 		if err != nil && err.Error() == "quiz not found" {
 			writeError(w, http.StatusNotFound, "quiz not found")

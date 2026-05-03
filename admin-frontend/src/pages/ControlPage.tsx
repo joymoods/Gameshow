@@ -4,8 +4,7 @@ import { useGameStore } from '../store/gameStore';
 import type { Question } from '../types';
 import type { ToastType } from '../App';
 import { useWebRTC } from '../hooks/useWebRTC';
-
-const API = import.meta.env.VITE_API_URL ?? `${window.location.protocol}//${window.location.hostname}`;
+import { API, apiFetch } from '../api/client';
 
 interface ScoreDelta {
   val: number;
@@ -57,7 +56,7 @@ function ScoreRow({
   async function save() {
     const val = parseInt(draft, 10);
     if (isNaN(val)) return;
-    await fetch(`${API}/api/rooms/${roomCode}/players/${playerId}/score`, {
+    await apiFetch(`${API}/api/rooms/${roomCode}/players/${playerId}/score`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ score: val }),
@@ -163,27 +162,27 @@ export default function ControlPage({ toast }: Props) {
     if (q.played) return;
     setShowAnswer(false);
     setAnswerBroadcast(false);
-    await fetch(`${API}/api/rooms/${roomCode}/question/${q.id}/open`, { method: 'POST' });
+    await apiFetch(`${API}/api/rooms/${roomCode}/question/${q.id}/open`, { method: 'POST' });
   }
 
   async function closeQuestion() {
-    await fetch(`${API}/api/rooms/${roomCode}/question/close`, { method: 'POST' });
+    await apiFetch(`${API}/api/rooms/${roomCode}/question/close`, { method: 'POST' });
     toast('Frage beendet', 'info');
   }
 
   async function revealAnswer() {
-    await fetch(`${API}/api/rooms/${roomCode}/question/reveal`, { method: 'POST' });
+    await apiFetch(`${API}/api/rooms/${roomCode}/question/reveal`, { method: 'POST' });
     setAnswerBroadcast(true);
     toast('Lösung an Spieler gesendet', 'success');
   }
 
   async function endBuzzerPhase() {
-    await fetch(`${API}/api/rooms/${roomCode}/question/end-buzzer`, { method: 'POST' });
+    await apiFetch(`${API}/api/rooms/${roomCode}/question/end-buzzer`, { method: 'POST' });
     toast('Buzzer-Phase beendet', 'warning');
   }
 
   async function startTimer(seconds: number) {
-    await fetch(`${API}/api/rooms/${roomCode}/question/timer`, {
+    await apiFetch(`${API}/api/rooms/${roomCode}/question/timer`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ seconds }),
@@ -194,7 +193,7 @@ export default function ControlPage({ toast }: Props) {
     if (!judgingPlayerId || !currentQuestion) return;
     setAnswering(true);
     try {
-      await fetch(`${API}/api/rooms/${roomCode}/answer`, {
+      await apiFetch(`${API}/api/rooms/${roomCode}/answer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ playerId: judgingPlayerId, correct }),
@@ -217,7 +216,7 @@ export default function ControlPage({ toast }: Props) {
   // Load current room state on mount so board is populated after page refresh
   useEffect(() => {
     if (!roomCode) return;
-    fetch(`${API}/api/rooms/${roomCode}`)
+    apiFetch(`${API}/api/rooms/${roomCode}`)
       .then((r) => r.ok ? r.json() : null)
       .then((snap) => { if (snap) handleMessage({ type: 'GAME_STATE', payload: snap }); })
       .catch(() => {});

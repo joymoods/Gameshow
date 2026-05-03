@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import type { RoomInfo } from '../types';
-
-const API = `${window.location.protocol}//${window.location.hostname}`;
+import { API, apiFetch } from '../api/client';
 
 interface LobbyState {
   activeRoomCode: string | null;
@@ -16,7 +15,7 @@ export const useLobbyStore = create<LobbyState>((set) => ({
 
   fetchRooms: async () => {
     try {
-      const res = await fetch(`${API}/api/rooms`);
+      const res = await apiFetch(`${API}/api/rooms`);
       if (res.ok) {
         const data: RoomInfo[] = await res.json() ?? [];
         set((state) => {

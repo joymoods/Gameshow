@@ -14,11 +14,16 @@
         reverse_proxy backend:8080
     }
 
-    # Admin-Frontend (unter /admin)
+    # Admin-Frontend (unter /admin) — P3: require HTTP Basic Auth before serving
+    # Generate hash with: docker run --rm caddy:2-alpine caddy hash-password --plaintext '<password>'
+    # Then set ADMIN_PASSWORD_HASH in the caddy environment (docker-compose.yml).
     handle /admin {
         redir * /admin/ 301
     }
     handle_path /admin/* {
+        basic_auth {
+            admin {$ADMIN_PASSWORD_HASH}
+        }
         root * /srv/admin
         try_files {path} /index.html
         file_server

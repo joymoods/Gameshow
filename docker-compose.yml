@@ -34,6 +34,9 @@ services:
       UPLOAD_DIR: /data/uploads
       DATABASE_URL: "postgres://brainstorm:brainstorm@postgres:5432/brainstorm"
       REDIS_URL: "redis://redis:6379"
+      # ADMIN_TOKEN: set to a strong random secret; required for all admin API routes.
+      # Generate with: openssl rand -hex 32
+      ADMIN_TOKEN: "${ADMIN_TOKEN}"
     volumes:
       - ./data:/data
     depends_on:
@@ -47,6 +50,10 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
+    environment:
+      # ADMIN_PASSWORD_HASH: bcrypt hash for /admin/* basicauth.
+      # Generate with: docker run --rm caddy:2-alpine caddy hash-password --plaintext '<password>'
+      ADMIN_PASSWORD_HASH: "${ADMIN_PASSWORD_HASH}"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
       - ./admin-frontend/dist:/srv/admin:ro

@@ -22,8 +22,14 @@ func NewRouter(manager *core.Manager, wsHandler *ws.Handler, quizStore *library.
 }
 
 func (ro *Router) Register(mux *http.ServeMux) {
-	mux.HandleFunc("/api/rooms", ro.withCORS(ro.handleRooms))
-	mux.HandleFunc("/api/rooms/", ro.withCORS(ro.handleRoomRoutes))
+	// All /api/rooms routes are admin-only: full game state including answers must
+	// never be exposed to unauthenticated callers (P1).
+	mux.HandleFunc("/api/rooms", ro.withCORS(ro.withAdminAuth(ro.handleRooms)))
+	mux.HandleFunc("/api/rooms/", ro.withCORS(ro.withAdminAuth(ro.handleRoomRoutes)))
+
+	// GET /api/library and GET /api/library/:id are intentionally public: the quiz
+	// catalog is a read-only, non-sensitive listing. All write operations (POST, PUT,
+	// DELETE) require admin auth and are checked inside the handlers (P2, P5).
 	mux.HandleFunc("/api/library", ro.withCORS(ro.handleLibraryCollection))
 	mux.HandleFunc("/api/library/", ro.withCORS(ro.handleLibraryRoutes))
 }

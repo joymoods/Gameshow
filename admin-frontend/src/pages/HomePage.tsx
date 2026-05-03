@@ -4,8 +4,7 @@ import { useLobbyStore } from '../store/lobbyStore';
 import type { GameType, RoomInfo } from '../types';
 import type { ToastType } from '../App';
 import brainstormLogo from '../assets/brainstorm-logo.png';
-
-const API = import.meta.env.VITE_API_URL ?? `${window.location.protocol}//${window.location.hostname}`;
+import { API, apiFetch } from '../api/client';
 
 const GAME_TYPES: { id: GameType; logo?: string; icon?: string; description: string }[] = [
   {
@@ -44,7 +43,7 @@ export default function HomePage({ toast }: Props) {
     if (creating) return;
     setCreating(gameType);
     try {
-      const res = await fetch(`${API}/api/rooms`, {
+      const res = await apiFetch(`${API}/api/rooms`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ game_type: gameType }),
@@ -73,7 +72,7 @@ export default function HomePage({ toast }: Props) {
     e.stopPropagation();
     if (!confirm(`Raum ${code} wirklich schließen?`)) return;
     try {
-      await fetch(`${API}/api/rooms/${code}`, { method: 'DELETE' });
+      await apiFetch(`${API}/api/rooms/${code}`, { method: 'DELETE' });
       fetchRooms();
     } catch {
       toast('Raum konnte nicht geschlossen werden', 'error');
