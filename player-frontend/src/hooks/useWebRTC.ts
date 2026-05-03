@@ -47,7 +47,7 @@ export function useWebRTC(myPeerID: string, myName: string) {
       try {
         await pc.setLocalDescription();
         // Guard: rollback may have occurred concurrently.
-        if (pc.signalingState === 'have-local-offer') {
+        if ((pc.signalingState as string) === 'have-local-offer') {
           send('WEBRTC_OFFER', { to: peerID, sdp: pc.localDescription });
         }
       } catch (e) {

@@ -366,7 +366,7 @@ func TestAnswer_Correct(t *testing.T) {
 	srv, manager := newTestServer(t)
 	code := createRoom(t, srv)
 	room, _ := manager.GetRoom(code)
-	alice, _ := room.AddPlayer("Alice")
+	alice, _, _ := room.AddPlayer("Alice")
 	doPost(t, srv.URL+"/api/rooms/"+code+"/quiz", testCategories())
 	doPost(t, srv.URL+"/api/rooms/"+code+"/start", nil)
 	doPost(t, srv.URL+"/api/rooms/"+code+"/question/q-1/open", nil)
@@ -392,7 +392,7 @@ func TestAnswer_Incorrect_OpensBuzzer(t *testing.T) {
 	srv, manager := newTestServer(t)
 	code := createRoom(t, srv)
 	room, _ := manager.GetRoom(code)
-	alice, _ := room.AddPlayer("Alice")
+	alice, _, _ := room.AddPlayer("Alice")
 	room.AddPlayer("Bob")
 	doPost(t, srv.URL+"/api/rooms/"+code+"/quiz", testCategories())
 	doPost(t, srv.URL+"/api/rooms/"+code+"/start", nil)
@@ -432,7 +432,7 @@ func TestCloseQuestion(t *testing.T) {
 	srv, manager := newTestServer(t)
 	code := createRoom(t, srv)
 	room, _ := manager.GetRoom(code)
-	alice, _ := room.AddPlayer("Alice")
+	alice, _, _ := room.AddPlayer("Alice")
 	doPost(t, srv.URL+"/api/rooms/"+code+"/quiz", testCategories())
 	doPost(t, srv.URL+"/api/rooms/"+code+"/start", nil)
 	doPost(t, srv.URL+"/api/rooms/"+code+"/question/q-1/open", nil)
@@ -467,7 +467,7 @@ func TestEndBuzzerPhase(t *testing.T) {
 	srv, manager := newTestServer(t)
 	code := createRoom(t, srv)
 	room, _ := manager.GetRoom(code)
-	alice, _ := room.AddPlayer("Alice")
+	alice, _, _ := room.AddPlayer("Alice")
 	room.AddPlayer("Bob")
 	doPost(t, srv.URL+"/api/rooms/"+code+"/quiz", testCategories())
 	doPost(t, srv.URL+"/api/rooms/"+code+"/start", nil)
@@ -517,8 +517,8 @@ func TestSetPlayerOrder(t *testing.T) {
 	srv, manager := newTestServer(t)
 	code := createRoom(t, srv)
 	room, _ := manager.GetRoom(code)
-	p1, _ := room.AddPlayer("Alice")
-	p2, _ := room.AddPlayer("Bob")
+	p1, _, _ := room.AddPlayer("Alice")
+	p2, _, _ := room.AddPlayer("Bob")
 
 	resp := doPost(t, srv.URL+"/api/rooms/"+code+"/players/order", []string{p2.ID, p1.ID})
 	if resp.StatusCode != http.StatusOK {
@@ -535,7 +535,7 @@ func TestSetPlayerScore(t *testing.T) {
 	srv, manager := newTestServer(t)
 	code := createRoom(t, srv)
 	room, _ := manager.GetRoom(code)
-	p, _ := room.AddPlayer("Alice")
+	p, _, _ := room.AddPlayer("Alice")
 
 	resp := doPost(t, srv.URL+"/api/rooms/"+code+"/players/"+p.ID+"/score",
 		map[string]int{"score": 750})
@@ -551,7 +551,7 @@ func TestSetPlayerScore_Negative(t *testing.T) {
 	srv, manager := newTestServer(t)
 	code := createRoom(t, srv)
 	room, _ := manager.GetRoom(code)
-	p, _ := room.AddPlayer("Alice")
+	p, _, _ := room.AddPlayer("Alice")
 
 	resp := doPost(t, srv.URL+"/api/rooms/"+code+"/players/"+p.ID+"/score",
 		map[string]int{"score": -500})

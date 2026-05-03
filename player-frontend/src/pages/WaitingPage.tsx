@@ -5,16 +5,17 @@ import { getGameLogo } from '../utils/gameLogos';
 
 export default function WaitingPage() {
   const navigate = useNavigate();
-  const { myPlayerName, myPlayerId, roomCode, players, roomPhase, roomReset, clearRoomReset, kicked, clearKicked, gameType } = useGameStore();
+  const { myPlayerName, myPlayerId, roomCode, players, roomPhase, roomReset, clearRoomReset, kicked, clearKicked, joinError, clearJoinError, gameType } = useGameStore();
   const gameLogo = getGameLogo(gameType);
 
   useEffect(() => {
     if (kicked) { clearKicked(); navigate('/?kicked=1'); return; }
+    if (joinError) { clearJoinError(); navigate(`/?joinError=${encodeURIComponent(joinError)}`); return; }
     if (roomReset) { clearRoomReset(); navigate('/'); return; }
     if (!roomPhase) return;
     if (roomPhase === 'IN_PROGRESS') navigate('/game');
     else if (roomPhase === 'GAME_OVER') navigate('/end');
-  }, [roomPhase, roomReset, kicked, navigate, clearRoomReset, clearKicked]);
+  }, [roomPhase, roomReset, kicked, joinError, navigate, clearRoomReset, clearKicked, clearJoinError]);
 
   if (!roomCode && !myPlayerName) {
     return (

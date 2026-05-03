@@ -7,7 +7,7 @@ import (
 func TestAddPlayer_New(t *testing.T) {
 	r := newRoom()
 
-	p, isNew := r.AddPlayer("Alice")
+	p, isNew, _ := r.AddPlayer("Alice")
 
 	if !isNew {
 		t.Error("expected isNew=true for first player")
@@ -28,7 +28,7 @@ func TestAddPlayer_New(t *testing.T) {
 
 func TestAddPlayer_AppendedToOrder(t *testing.T) {
 	r := newRoom()
-	p, _ := r.AddPlayer("Alice")
+	p, _, _ := r.AddPlayer("Alice")
 
 	if len(r.PlayerOrder) != 1 || r.PlayerOrder[0] != p.ID {
 		t.Error("expected player ID in PlayerOrder after add")
@@ -37,10 +37,10 @@ func TestAddPlayer_AppendedToOrder(t *testing.T) {
 
 func TestAddPlayer_Reconnect_CaseInsensitive(t *testing.T) {
 	r := newRoom()
-	p1, _ := r.AddPlayer("Alice")
+	p1, _, _ := r.AddPlayer("Alice")
 	p1.Connected = false
 
-	p2, isNew := r.AddPlayer("alice")
+	p2, isNew, _ := r.AddPlayer("alice")
 
 	if isNew {
 		t.Error("expected isNew=false for reconnect")
@@ -58,7 +58,7 @@ func TestAddPlayer_Reconnect_CaseInsensitive(t *testing.T) {
 
 func TestAddPlayer_Reconnect_DoesNotDuplicateOrder(t *testing.T) {
 	r := newRoom()
-	p, _ := r.AddPlayer("Alice")
+	p, _, _ := r.AddPlayer("Alice")
 	p.Connected = false
 	r.AddPlayer("Alice")
 
@@ -69,7 +69,7 @@ func TestAddPlayer_Reconnect_DoesNotDuplicateOrder(t *testing.T) {
 
 func TestRemovePlayer_SetsDisconnected(t *testing.T) {
 	r := newRoom()
-	p, _ := r.AddPlayer("Alice")
+	p, _, _ := r.AddPlayer("Alice")
 
 	r.RemovePlayer(p.ID)
 
@@ -89,7 +89,7 @@ func TestRemovePlayer_NonExistent(t *testing.T) {
 
 func TestGetPlayer_Found(t *testing.T) {
 	r := newRoom()
-	p, _ := r.AddPlayer("Alice")
+	p, _, _ := r.AddPlayer("Alice")
 
 	got := r.GetPlayer(p.ID)
 	if got == nil || got.ID != p.ID {
@@ -108,7 +108,7 @@ func TestGetPlayer_NotFound(t *testing.T) {
 
 func TestActivePlayer_Single(t *testing.T) {
 	r := newRoom()
-	p, _ := r.AddPlayer("Alice")
+	p, _, _ := r.AddPlayer("Alice")
 
 	active := r.ActivePlayer()
 	if active == nil {
@@ -128,9 +128,9 @@ func TestActivePlayer_Empty(t *testing.T) {
 
 func TestNextActivePlayer_Rotates(t *testing.T) {
 	r := newRoom()
-	p1, _ := r.AddPlayer("Alice")
-	p2, _ := r.AddPlayer("Bob")
-	p3, _ := r.AddPlayer("Charlie")
+	p1, _, _ := r.AddPlayer("Alice")
+	p2, _, _ := r.AddPlayer("Bob")
+	p3, _, _ := r.AddPlayer("Charlie")
 
 	if r.ActivePlayer().ID != p1.ID {
 		t.Error("expected Alice first")
@@ -154,7 +154,7 @@ func TestNextActivePlayer_Rotates(t *testing.T) {
 
 func TestApplyResult_Correct(t *testing.T) {
 	r := newRoom()
-	p, _ := r.AddPlayer("Alice")
+	p, _, _ := r.AddPlayer("Alice")
 
 	delta, newScore := r.ApplyResult(p.ID, true, 100)
 
@@ -171,7 +171,7 @@ func TestApplyResult_Correct(t *testing.T) {
 
 func TestApplyResult_Incorrect(t *testing.T) {
 	r := newRoom()
-	p, _ := r.AddPlayer("Alice")
+	p, _, _ := r.AddPlayer("Alice")
 
 	delta, newScore := r.ApplyResult(p.ID, false, 100)
 
@@ -185,7 +185,7 @@ func TestApplyResult_Incorrect(t *testing.T) {
 
 func TestApplyResult_NegativeScore(t *testing.T) {
 	r := newRoom()
-	p, _ := r.AddPlayer("Alice")
+	p, _, _ := r.AddPlayer("Alice")
 
 	r.ApplyResult(p.ID, false, 200)
 	_, newScore := r.ApplyResult(p.ID, false, 200)
@@ -197,7 +197,7 @@ func TestApplyResult_NegativeScore(t *testing.T) {
 
 func TestApplyResult_Accumulates(t *testing.T) {
 	r := newRoom()
-	p, _ := r.AddPlayer("Alice")
+	p, _, _ := r.AddPlayer("Alice")
 
 	r.ApplyResult(p.ID, true, 200)
 	r.ApplyResult(p.ID, true, 100)
@@ -220,7 +220,7 @@ func TestApplyResult_UnknownPlayer(t *testing.T) {
 
 func TestAdjustScore(t *testing.T) {
 	r := newRoom()
-	p, _ := r.AddPlayer("Alice")
+	p, _, _ := r.AddPlayer("Alice")
 
 	ok := r.AdjustScore(p.ID, 999)
 	if !ok {
@@ -233,7 +233,7 @@ func TestAdjustScore(t *testing.T) {
 
 func TestAdjustScore_Negative(t *testing.T) {
 	r := newRoom()
-	p, _ := r.AddPlayer("Alice")
+	p, _, _ := r.AddPlayer("Alice")
 
 	r.AdjustScore(p.ID, -500)
 	if r.GetPlayer(p.ID).Score != -500 {
@@ -252,7 +252,7 @@ func TestAdjustScore_NotFound(t *testing.T) {
 func TestConnectedPlayerCount(t *testing.T) {
 	r := newRoom()
 	r.AddPlayer("Alice")
-	p2, _ := r.AddPlayer("Bob")
+	p2, _, _ := r.AddPlayer("Bob")
 	r.RemovePlayer(p2.ID)
 
 	if r.ConnectedPlayerCount() != 1 {
@@ -269,8 +269,8 @@ func TestConnectedPlayerCount_Zero(t *testing.T) {
 
 func TestConnectedPlayerIDs(t *testing.T) {
 	r := newRoom()
-	p1, _ := r.AddPlayer("Alice")
-	p2, _ := r.AddPlayer("Bob")
+	p1, _, _ := r.AddPlayer("Alice")
+	p2, _, _ := r.AddPlayer("Bob")
 	r.RemovePlayer(p2.ID)
 
 	ids := r.ConnectedPlayerIDs()
@@ -281,8 +281,8 @@ func TestConnectedPlayerIDs(t *testing.T) {
 
 func TestSetPlayerOrder(t *testing.T) {
 	r := newRoom()
-	p1, _ := r.AddPlayer("Alice")
-	p2, _ := r.AddPlayer("Bob")
+	p1, _, _ := r.AddPlayer("Alice")
+	p2, _, _ := r.AddPlayer("Bob")
 
 	r.SetPlayerOrder([]string{p2.ID, p1.ID})
 
@@ -351,7 +351,7 @@ func TestSnapshot_Basic(t *testing.T) {
 
 func TestSnapshot_ActivePlayerID(t *testing.T) {
 	r := newRoom()
-	p, _ := r.AddPlayer("Alice")
+	p, _, _ := r.AddPlayer("Alice")
 
 	snap := r.Snapshot()
 	if snap.ActivePlayerID != p.ID {

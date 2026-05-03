@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"math/rand"
 	"strings"
 	"sync"
@@ -68,14 +69,19 @@ func (r *Room) SetPhase(phase RoomPhase) {
 	r.Phase = phase
 }
 
-func (r *Room) AddPlayer(name string) (*Player, bool) {
+var ErrNameTaken = errors.New("name already taken")
+
+func (r *Room) AddPlayer(name string) (*Player, bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	for _, p := range r.Players {
 		if strings.EqualFold(p.Name, name) {
+			if p.Connected {
+				return nil, false, ErrNameTaken
+			}
 			p.Connected = true
-			return p, false
+			return p, false, nil
 		}
 	}
 
@@ -87,7 +93,7 @@ func (r *Room) AddPlayer(name string) (*Player, bool) {
 	}
 	r.Players = append(r.Players, p)
 	r.PlayerOrder = append(r.PlayerOrder, p.ID)
-	return p, true
+	return p, true, nil
 }
 
 func (r *Room) RemovePlayer(id string) {
