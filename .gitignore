@@ -1,3 +1,23 @@
+# Secrets
+.env
+
+# Generierte Frontend-Builds (von Caddy gemountet, nicht tracken)
+admin-frontend/dist/
+player-frontend/dist/
+
+# Backend
 backend/uploads/
-data
+
+# Persistente Laufzeit-Daten (Postgres-Volumes, Uploads)
+data/
+
+# Temporäre Doku-Medien
 docs/media/tmp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude
+.claude/
+.claudeignore

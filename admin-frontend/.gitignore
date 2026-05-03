@@ -12,7 +12,11 @@ dist
 dist-ssr
 *.local
 
-# Editor directories and files
+# Secrets – .env enthält VITE_ADMIN_TOKEN; .env.example ist eine Vorlage und wird getrackt
+.env
+!.env.example
+
+# Editor
 .vscode/*
 !.vscode/extensions.json
 .idea

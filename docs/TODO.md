@@ -1,89 +1,107 @@
 # BrainStorm – Projekt-Backlog
 
 > Dieses Dokument beschreibt alle Aufgaben geordnet nach Phase und Bereich.
-> Die ursprüngliche Jeopardy-App ist vollständig implementiert und auf Multi-Game-Architektur migriert.
 
 ---
 
 ## Phase 1 — Backend (Go) ✅
 
-- [x] Go-Modul initialisieren, Abhängigkeiten (websocket, uuid)
+- [x] Go-Modul, Abhängigkeiten (websocket, uuid)
 - [x] `game/core/`: Manager, Room, Player, Game-Interface, RoomPhase
 - [x] `game/jeopardy/`: JeopardyGame als Game-Interface-Implementierung
 - [x] `ws/`: WebSocket-Handler, Hub, generische Message-Typen
 - [x] `api/routes.go`: REST-Endpunkte (rooms, quiz, players, answer, game-switch, …)
 - [x] `media/`: Datei-Upload-Handler + statischer File-Server
 - [x] Multi-Room-Registry (parallele Rooms)
-- [x] GAME_STATE-Payload um `game_type`, `room_phase`, `game_state` erweitert
+- [x] GAME_STATE-Payload: `game_type`, `room_phase`, `game_state`
 - [x] `GAME_SWITCHED`-WS-Nachricht bei Spieltyp-Wechsel
-- [x] `go build ./... && go vet ./...` fehlerfrei
 
 ---
 
-## Phase 2 — Admin-Frontend (React + TypeScript + Vite) ✅
+## Phase 2 — Admin-Frontend ✅
 
-- [x] Quiz-Builder: Kategorien + Fragen erstellen, Medien hochladen, JSON-Export/Import
+- [x] Quiz-Builder: Kategorien + Fragen, Medien hochladen, JSON-Export/Import
 - [x] Lobby: Room-Code, Spieler, Drag & Drop Reihenfolge, Spiel starten
 - [x] Control Panel: Board, Fragen öffnen, Buzzer, Antwort bewerten, Scores, Spiel beenden
 - [x] Startseite: Room-Liste, Room erstellen mit Spieltyp-Auswahl
 - [x] URL-basiertes Routing (`/rooms/:code/lobby`, `/rooms/:code/control`)
-- [x] `lobbyStore`: activeRoomCode + Rooms-Liste
-- [x] `gameType` + `roomPhase` im `gameStore`; `GAME_SWITCHED`-Handler
-- [x] `npm run build` fehlerfrei
 
 ---
 
-## Phase 3 — Player-Frontend (React + TypeScript + Vite) ✅
+## Phase 3 — Player-Frontend ✅
 
 - [x] Join, Warteraum, Jeopardy-Spielansicht (Board + Buzzer + Score), Endscreen
-- [x] Auto-Erkennung des Spieltyps aus `game_type` in GAME_STATE
+- [x] Auto-Erkennung des Spieltyps aus `game_type`
 - [x] Navigation auf `roomPhase` (`IN_PROGRESS` → `/game`, `GAME_OVER` → `/end`)
-- [x] `JeopardyGame`-Komponente extrahiert; `GamePage` ist generischer Dispatcher
-- [x] `GAME_SWITCHED`-Handler im Store
-- [x] `npm run build` fehlerfrei
+- [x] `GAME_SWITCHED`-Handler
 
 ---
 
 ## Phase 4 — Design & Polish ✅
 
-- [x] Design-System (CSS-Variablen: Farben, Fonts, Spacing)
-- [x] Admin-Frontend vollständig gestylt
-- [x] Player-Frontend vollständig gestylt (inkl. Buzzer-Feedback, Score-Animationen)
-- [x] Animationen: Score-Delta-Flash, Fragen-Overlay, Buzzer-Feedback
-- [x] Responsive: Player-Frontend funktioniert auf Mobilgeräten
+- [x] Design-System (CSS-Variablen)
+- [x] Admin- und Player-Frontend gestylt
+- [x] Animationen: Score-Delta, Fragen-Overlay, Buzzer-Feedback
+- [x] Responsive: Player-Frontend auf Mobilgeräten
 
 ---
 
-## Phase 5 — Deployment-Vorbereitung ✅
+## Phase 5 — Deployment ✅
 
-- [x] Environment-Variablen für Backend-URL konfigurieren (`.env` in Frontends)
-- [x] `docker-compose.yml` für lokales Setup (Backend + statische Frontends)
-- [x] Caddy-Config für Reverse Proxy (Backend API + WebSocket + Frontend)
-- [x] README mit Setup-Anleitung schreiben
+- [x] `docker-compose.yml` mit Backend + Caddy + PostgreSQL + Redis
+- [x] Caddy-Config: Reverse Proxy, statische Frontends, HTTP Basic Auth für `/admin/*`
+- [x] README mit vollständiger Setup-Anleitung
 
 ---
 
-## Post-Migration — Offene Punkte
+## Phase 6 — Features & Bugfixes ✅
 
-### Backend
-- [x] Room-Cleanup: abgeschlossene oder leere Rooms nach Timeout entfernen
-- [x] Persist-Option: PostgreSQL-Datenbank + Redis-Cache eingeführt; Quiz-Bibliothek implementiert (GET/POST/PUT/DELETE /api/library)
-- [ ] Zweiter Spieltyp implementieren (z.B. Quiz mit Multiple-Choice) als Proof-of-Concept
-
-### Admin-Frontend
-- [x] QR-Code generieren und anzeigen (statt Placeholder)
-- [x] Bestätigung wenn Admin-Tab geschlossen wird während Spiel läuft
+- [x] Room-Cleanup: abgeschlossene/leere Rooms nach Timeout
+- [x] PostgreSQL + Redis: Quiz-Bibliothek (GET/POST/PUT/DELETE /api/library)
+- [x] WebRTC: Kamera-Übertragung zwischen Admin und Spielern
+- [x] Countdown-Timer: Admin startet/stoppt Timer pro Frage; synchron bei allen Clients
+- [x] QR-Code in Lobby
 - [x] Builder: Fragen per Drag & Drop neu anordnen
+- [x] Sound-Effekte (Buzzer, richtig/falsch)
+- [x] Bestätigung beim Schließen des Admin-Tabs während laufendem Spiel
+- [x] Score manuell korrigieren (Klick auf Wert im Control Panel)
+- [x] Spieler kicken aus der Lobby
+- [x] Reconnect-Handling (gleicher Name = gleicher Spieler)
+- [x] WS-Keepalive-Pings (verhindert Timeout-Drops)
+- [x] Initial-State-Push bei WS-Connect (kein extra GET nötig)
+- [x] Debugsession: 7 Bugs (QUESTION_OPENED-Antwort, Quiz-Pflicht vor Start, u.a.)
+- [x] Debugsession 2 (2026-04-28): 5 Bugs — GAME_STATE-Restore, WaitingPage-Navigation, reveal()-Guard, ResetPlayerClients, WS-URL-Protokoll
+- [x] Debugsession 3 (2026-04-28): 4 Bugs — Deadlock-Risiko (r.mu/j.mu), VITE_API_URL fehlend
+- [x] Debugsession 4 (2026-04-28): Antworten nicht an Player-Clients leaken; Quiz-Wipe-Bug bei Spieltyp-Wechsel auf denselben Typ
 
-### Player-Frontend
-- [x] Sound-Effekte: Buzzer-Sound, richtig/falsch Feedback
-- [x] Landscape-Optimierung für Mobilgeräte
+---
 
-### Allgemein
-- [x] Abschluss-Manuelltest: vollständige Jeopardy-Runde (Join → Lobby → Spiel → End)
-- [x] Auth für Admin-Frontend (einfacher PIN-Schutz reicht für Heimnetz)
-- [x] Debugsession: 7 Bugs behoben (Antwort in QUESTION_OPENED, Quiz-Pflicht vor Start, closeQuestion-Guard, API-Responses, WaitingPage-Reaktivität)
-- [x] Debugsession 2 (2026-04-28): 5 weitere Bugs behoben — `answer` nach GAME_STATE-Restore, WaitingPage ROOM_RESET-Navigation, reveal()-Error ohne aktive Frage, globales ResetPlayerClients beim Raum-Erstellen, WS-URL-Protokoll im Admin-Frontend; `PhaseLobby`-Konstante eingeführt
-- [x] Debugsession 3 (2026-04-28): 4 Bugs behoben — Deadlock-Risiko (Lock-Order-Inversion r.mu/j.mu in Room.Snapshot), VITE_API_URL fehlend in HomePage.tsx und JoinPage.tsx, unnötiger setIdentity-Aufruf in buzz()
-- [x] Debugsession 4 (2026-04-28): 2 Bugs behoben — (1) GAME_STATE leaked Antworten im Board an Player-Clients via WS (BroadcastGameState/handleJoinGame jetzt split: Admin full, Player public ohne answers); (2) handleSwitchGame überschrieb Quiz bei Wechsel auf denselben Spieltyp (guard: nur neues Game-Objekt wenn Typ sich ändert)
-- [x] Admin-Timer: Admin kann Countdown-Timer manuell starten (15s/30s/60s) während eine Frage offen ist; Timer läuft bei allen Clients synchron; Stopp-Button für Admin; visuelle Anzeige in Admin-Panel und Player-Overlay; Timer-State im Snapshot (reconnect-safe)
+## Phase 7 — Security-Härtung ✅ (2026-05-03)
+
+- [x] P1: `GET /api/rooms` erfordert Bearer-Token (Antworten nicht öffentlich)
+- [x] P2: Library-Write-Routen (POST/PUT/DELETE) erfordern Admin-Auth
+- [x] P3: `/admin/*` hinter Caddy HTTP Basic Auth
+- [x] P4: Generische Fehlermeldungen für unauthentifizierte Caller (kein Schema-Leak)
+- [x] P5: `GET /api/library` bewusst öffentlich — dokumentiert
+- [x] Auth-Middleware in `api/auth.go` mit Bearer-Token aus `ADMIN_TOKEN`-Env
+- [x] Admin-Frontend: zentraler `apiFetch()`-Wrapper sendet Token bei jedem Request
+- [x] Tests auf neue Auth-Header aktualisiert
+
+---
+
+## Phase 8 — Dev-Experience ✅ (2026-05-03)
+
+- [x] `Makefile`: `make build`, `make build-admin`, `make build-player`, `make deploy`, `make sync-env`
+- [x] `make sync-env` liest `ADMIN_TOKEN` aus Root-`.env` → schreibt `VITE_ADMIN_TOKEN` in `admin-frontend/.env`
+- [x] Root `.env.example` mit Erklärungen + Erzeugungsbefehlen
+- [x] `admin-frontend/.env.example` und `player-frontend/.env.example` vollständig dokumentiert
+- [x] `.gitignore` bereinigt: dist-Ordner, `.env` in Frontends, OS-Dateien
+
+---
+
+## Offen
+
+- [ ] Zweiter Spieltyp (z.B. Multiple-Choice) als Proof-of-Concept für das Game-Interface
+- [ ] Persist-Option für Room-State (aktuell In-Memory; geht verloren bei Neustart)
+- [ ] Automatischer Timer-Ablauf: optionale Aktion wenn Timer auf 0 läuft
+- [ ] Testplan aktualisieren: Auth-Flow, Library, Timer, WebRTC-Abschnitte ergänzen
