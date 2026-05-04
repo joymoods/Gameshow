@@ -1,4 +1,4 @@
-export const API = import.meta.env.VITE_API_URL ?? `${window.location.protocol}//${window.location.hostname}`;
+export const API = import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}`;
 
 const TOKEN = import.meta.env.VITE_ADMIN_TOKEN as string | undefined;
 

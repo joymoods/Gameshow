@@ -1,8 +1,9 @@
 import { useGameStore } from '../store/gameStore';
 import type { WsMessage } from '../types';
 
-const _apiBase = import.meta.env.VITE_API_URL ?? `${window.location.protocol}//${window.location.hostname}`;
-const WS_URL = _apiBase.replace(/^https/, 'wss').replace(/^http/, 'ws') + '/ws?role=admin';
+const _apiBase = import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}`;
+const TOKEN = import.meta.env.VITE_ADMIN_TOKEN as string | undefined;
+const WS_URL = _apiBase.replace(/^https/, 'wss').replace(/^http/, 'ws') + '/ws?role=admin' + (TOKEN ? `&token=${TOKEN}` : '');
 
 type MsgListener = (msg: WsMessage) => void;
 const msgListeners: MsgListener[] = [];

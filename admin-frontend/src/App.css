@@ -662,6 +662,9 @@ input:focus, textarea:focus, select:focus { border-color: var(--primary); }
 }
 .q-no-answer { color: var(--text-muted); font-size: 12px; font-style: italic; }
 .q-media { max-width: 100%; max-height: 160px; border-radius: 4px; margin-top: 8px; display: block; }
+.q-media--zoomable { cursor: zoom-in; transition: opacity 0.15s; }
+.q-media--zoomable:hover { opacity: 0.85; }
+.q-media--video { max-height: 280px; width: 100%; }
 
 /* Phase panel */
 .phase-indicator {
@@ -1095,6 +1098,23 @@ input:focus, textarea:focus, select:focus { border-color: var(--primary); }
 .pin-input:focus { border-color: var(--primary); }
 .pin-input--error { border-color: var(--danger); animation: shake 0.3s ease; }
 .pin-error { color: var(--danger); font-size: 13px; }
+.pin-pass-wrap { position: relative; }
+.pin-pass-wrap .pin-input { width: 100%; padding-right: 42px; box-sizing: border-box; }
+.pin-show-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+.pin-show-btn:hover { opacity: 1; }
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
   25% { transform: translateX(-6px); }
@@ -1141,65 +1161,46 @@ input:focus, textarea:focus, select:focus { border-color: var(--primary); }
 }
 .sidebar-label-row .sidebar-label { margin-bottom: 0; }
 
-.admin-cam-video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 50%;
-  display: block;
-}
-.admin-cam-video--mirrored { transform: scaleX(-1); }
-.admin-cam-avatar {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: inherit;
-}
-
-/* Own cam preview row */
-.admin-own-cam-row {
+/* ---- Media sync controls ---- */
+.media-sync-controls {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--border);
+  margin: 8px 0 4px;
 }
-.admin-own-cam-wrap {
-  width: 48px;
-  height: 27px;
-  border-radius: 4px;
-  overflow: hidden;
-  flex-shrink: 0;
-  background: var(--surface2);
-}
-.admin-own-cam-wrap .admin-cam-video {
-  border-radius: 4px;
-}
-.admin-own-cam-label {
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-/* Camera toggle button */
-.cam-toggle-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
+.media-sync-btn {
+  padding: 5px 14px;
+  border-radius: 6px;
   border: none;
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
+  transition: all 0.15s;
+}
+.media-sync-btn--play { background: rgba(34,197,94,0.15); color: var(--success); border: 1px solid rgba(34,197,94,0.3); }
+.media-sync-btn--pause { background: rgba(240,180,41,0.15); color: var(--gold); border: 1px solid rgba(240,180,41,0.3); }
+.media-sync-btn:hover { filter: brightness(1.15); }
+.media-sync-hint { font-size: 11px; color: var(--text-muted); }
+
+/* ---- Image zoom lightbox ---- */
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0,0,0,0.92);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
-  flex-shrink: 0;
+  cursor: zoom-out;
+  animation: fadeIn 0.15s ease;
 }
-.cam-toggle-btn.cam-off { background: var(--surface2); }
-.cam-toggle-btn.cam-on  { background: rgba(79,110,247,0.2); border: 2px solid var(--primary); }
-.cam-toggle-btn:hover   { transform: scale(1.1); }
+.lightbox-img {
+  max-width: 95vw;
+  max-height: 92vh;
+  border-radius: 8px;
+  object-fit: contain;
+  box-shadow: 0 8px 48px rgba(0,0,0,0.6);
+}
 
 /* ---- Timer controls (admin) ---- */
 .timer-control {

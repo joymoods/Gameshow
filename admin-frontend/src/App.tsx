@@ -6,7 +6,7 @@ import LobbyPage from './pages/LobbyPage';
 import ControlPage from './pages/ControlPage';
 import HomePage from './pages/HomePage';
 import LibraryPage from './pages/LibraryPage';
-import PinPage from './pages/PinPage';
+import LoginPage, { LOGIN_REQUIRED } from './pages/LoginPage';
 import { useGameStore } from './store/gameStore';
 import { useLobbyStore } from './store/lobbyStore';
 import { API, apiFetch } from './api/client';
@@ -42,6 +42,24 @@ function Toasts({ toasts }: { toasts: Toast[] }) {
       ))}
     </div>
   );
+}
+
+// ---- Auth helpers ----
+
+const AUTH_KEY = 'admin_authed';
+
+export function isAuthed(): boolean {
+  // If no credentials are configured, login is not required
+  if (!LOGIN_REQUIRED) return true;
+  return localStorage.getItem(AUTH_KEY) === '1';
+}
+
+export function setAuthed() {
+  localStorage.setItem(AUTH_KEY, '1');
+}
+
+export function clearAuth() {
+  localStorage.removeItem(AUTH_KEY);
 }
 
 // ---- Nav ----
@@ -88,7 +106,7 @@ function Nav({ onEndGame }: { onEndGame?: () => void }) {
   );
 }
 
-// ---- Route wrappers that need URL params ----
+// ---- Route wrappers ----
 
 function ControlRoute({ toast }: { toast: (msg: string, type?: ToastType) => void }) {
   const { code } = useParams<{ code: string }>();
@@ -111,60 +129,80 @@ function ControlRoute({ toast }: { toast: (msg: string, type?: ToastType) => voi
   );
 }
 
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  if (!isAuthed()) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
+
 // ---- App shell ----
 
 function AppShell() {
   const { toasts, add: toast } = useToasts();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    connect();
+  }, []);
 
   return (
     <div className="app-shell">
       <Routes>
-        {/* New routes */}
+        <Route
+          path="/login"
+          element={
+            !LOGIN_REQUIRED || isAuthed()
+              ? <Navigate to="/" replace />
+              : <LoginPage onAuth={() => { setAuthed(); connect(); navigate('/'); }} />
+          }
+        />
+
         <Route
           path="/"
           element={
-            <>
+            <ProtectedRoute>
               <Nav />
               <HomePage toast={toast} />
-            </>
+            </ProtectedRoute>
           }
         />
         <Route
           path="/builder/jeopardy"
           element={
-            <>
+            <ProtectedRoute>
               <Nav />
               <BuilderPage toast={toast} />
-            </>
+            </ProtectedRoute>
           }
         />
         <Route
           path="/library"
           element={
-            <>
+            <ProtectedRoute>
               <Nav />
               <LibraryPage toast={toast} />
-            </>
+            </ProtectedRoute>
           }
         />
         <Route
           path="/rooms/:code/lobby"
           element={
-            <>
+            <ProtectedRoute>
               <Nav />
               <LobbyPage toast={toast} />
-            </>
+            </ProtectedRoute>
           }
         />
         <Route
           path="/rooms/:code/control"
-          element={<ControlRoute toast={toast} />}
+          element={
+            <ProtectedRoute>
+              <ControlRoute toast={toast} />
+            </ProtectedRoute>
+          }
         />
 
-        {/* Legacy redirects – keep old bookmarks working */}
         <Route path="/lobby" element={<Navigate to="/" replace />} />
         <Route path="/control" element={<Navigate to="/" replace />} />
-
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <Toasts toasts={toasts} />
@@ -172,21 +210,7 @@ function AppShell() {
   );
 }
 
-const REQUIRED_PIN = import.meta.env.VITE_ADMIN_PIN as string | undefined;
-
 export default function App() {
-  const [authed, setAuthed] = useState(
-    !REQUIRED_PIN || sessionStorage.getItem('admin_auth') === '1'
-  );
-
-  useEffect(() => {
-    if (authed) connect();
-  }, [authed]);
-
-  if (!authed) {
-    return <PinPage onAuth={() => setAuthed(true)} />;
-  }
-
   return (
     <BrowserRouter basename="/admin">
       <AppShell />

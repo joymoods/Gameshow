@@ -3,8 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useGameStore } from '../store/gameStore';
 import type { Question } from '../types';
 import type { ToastType } from '../App';
-import { useWebRTC } from '../hooks/useWebRTC';
 import { API, apiFetch } from '../api/client';
+import { send, addMessageListener } from '../ws/socket';
 
 interface ScoreDelta {
   val: number;
@@ -15,40 +15,12 @@ interface Props {
   toast: (msg: string, type?: ToastType) => void;
 }
 
-// ---- Cam Tile ----
-
-function CamTile({ stream, name, isSelf }: { stream: MediaStream | null; name: string; isSelf: boolean }) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  useEffect(() => {
-    if (videoRef.current && stream) {
-      videoRef.current.srcObject = stream;
-    }
-  }, [stream]);
-
-  if (!stream) {
-    return (
-      <div className="admin-cam-avatar">
-        {name[0]?.toUpperCase() ?? '?'}
-      </div>
-    );
-  }
-  return (
-    <video
-      ref={videoRef}
-      autoPlay
-      playsInline
-      muted={isSelf}
-      className={`admin-cam-video${isSelf ? ' admin-cam-video--mirrored' : ''}`}
-    />
-  );
-}
-
 // ---- Score Row ----
 
 function ScoreRow({
-  playerId, name, score, roomCode, isActive, delta, camStream,
+  playerId, name, score, roomCode, isActive, delta,
 }: {
-  playerId: string; name: string; score: number; roomCode: string; isActive: boolean; delta?: ScoreDelta; camStream?: MediaStream | null;
+  playerId: string; name: string; score: number; roomCode: string; isActive: boolean; delta?: ScoreDelta;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(String(score));
@@ -67,11 +39,7 @@ function ScoreRow({
   return (
     <div className="score-row">
       <div className={`score-avatar ${isActive ? 'is-active' : 'not-active'}`}>
-        {camStream !== undefined ? (
-          <CamTile stream={camStream ?? null} name={name} isSelf={false} />
-        ) : (
-          name[0]
-        )}
+        {name[0]}
       </div>
       <span className={`score-name ${isActive ? 'is-active' : ''}`}>{name}</span>
       <div style={{ position: 'relative' }}>
@@ -119,17 +87,58 @@ export default function ControlPage({ toast }: Props) {
     finalScores, resetGameState, handleMessage,
     timerEndsAt, timerDurMs,
   } = useGameStore();
-  // Prefer URL param so the page works when navigated directly
   const roomCode = urlCode ?? storeRoomCode;
-
-  const { camEnabled, activeCams, myStream, toggleCam } = useWebRTC('admin', 'Moderator');
 
   const [answering, setAnswering] = useState(false);
   const [showAnswer, setShowAnswer] = useState(false);
   const [answerBroadcast, setAnswerBroadcast] = useState(false);
   const [deltas, setDeltas] = useState<Record<string, ScoreDelta>>({});
 
-  // Timer countdown (seconds remaining, recomputed from timerEndsAt every second)
+  // Media state
+  const [mediaPlaying, setMediaPlaying] = useState(false);
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  // Reset media state when question changes
+  useEffect(() => {
+    setMediaPlaying(false);
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.currentTime = 0;
+    }
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+  }, [currentQuestion?.questionId]);
+
+  // Sync own media element when mediaPlaying changes
+  useEffect(() => {
+    if (mediaPlaying) {
+      videoRef.current?.play().catch(() => {});
+      audioRef.current?.play().catch(() => {});
+    } else {
+      videoRef.current?.pause();
+      audioRef.current?.pause();
+    }
+  }, [mediaPlaying]);
+
+  // Receive MEDIA_PLAY/PAUSE from server (echoed back to admin too)
+  useEffect(() => {
+    return addMessageListener((msg) => {
+      if (msg.type === 'MEDIA_PLAY') setMediaPlaying(true);
+      if (msg.type === 'MEDIA_PAUSE') setMediaPlaying(false);
+    });
+  }, []);
+
+  function toggleMedia() {
+    const next = !mediaPlaying;
+    send(next ? 'MEDIA_PLAY' : 'MEDIA_PAUSE', {});
+    // State will be updated via the echoed WS message
+  }
+
+  // Timer countdown
   const [timerRemaining, setTimerRemaining] = useState<number | null>(null);
   useEffect(() => {
     if (!timerEndsAt) { setTimerRemaining(null); return; }
@@ -213,7 +222,6 @@ export default function ControlPage({ toast }: Props) {
     }
   }
 
-  // Load current room state on mount so board is populated after page refresh
   useEffect(() => {
     if (!roomCode) return;
     apiFetch(`${API}/api/rooms/${roomCode}`)
@@ -222,7 +230,6 @@ export default function ControlPage({ toast }: Props) {
       .catch(() => {});
   }, [roomCode]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Warn before leaving while game is running
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
       if (roomPhase === 'IN_PROGRESS') { e.preventDefault(); e.returnValue = ''; }
@@ -231,7 +238,6 @@ export default function ControlPage({ toast }: Props) {
     return () => window.removeEventListener('beforeunload', handler);
   }, [roomPhase]);
 
-  // Keyboard shortcuts
   const judgeRef = useRef(judgeAnswer);
   judgeRef.current = judgeAnswer;
 
@@ -255,7 +261,6 @@ export default function ControlPage({ toast }: Props) {
     );
   }
 
-  // Game over
   if (phase === 'GAME_OVER') {
     const scores = finalScores.length > 0 ? finalScores : players;
     const sorted = [...scores].sort((a, b) => b.score - a.score);
@@ -356,9 +361,37 @@ export default function ControlPage({ toast }: Props) {
                 <span className="q-points">{currentQuestion.points} Pts</span>
               </div>
               <p className="q-text">{currentQuestion.text}</p>
-              {currentQuestion.imageUrl && <img src={currentQuestion.imageUrl} alt="" className="q-media" />}
-              {currentQuestion.audioUrl && <audio src={currentQuestion.audioUrl} controls className="q-media" />}
-              {currentQuestion.videoUrl && <video src={currentQuestion.videoUrl} controls className="q-media" />}
+
+              {currentQuestion.imageUrl && (
+                <img
+                  src={currentQuestion.imageUrl}
+                  alt=""
+                  className="q-media q-media--zoomable"
+                  onClick={() => setZoomedImage(currentQuestion.imageUrl!)}
+                  title="Klicken zum Vergrößern"
+                />
+              )}
+
+              {(currentQuestion.audioUrl || currentQuestion.videoUrl) && (
+                <div className="media-sync-controls">
+                  <button
+                    className={`media-sync-btn ${mediaPlaying ? 'media-sync-btn--pause' : 'media-sync-btn--play'}`}
+                    onClick={toggleMedia}
+                    title={mediaPlaying ? 'Pause für alle' : 'Play für alle'}
+                  >
+                    {mediaPlaying ? '⏸ Pause' : '▶ Play'}
+                  </button>
+                  <span className="media-sync-hint">synchron bei allen Spielern</span>
+                </div>
+              )}
+
+              {currentQuestion.audioUrl && (
+                <audio ref={audioRef} src={currentQuestion.audioUrl} controls className="q-media" style={{ width: '100%' }} />
+              )}
+              {currentQuestion.videoUrl && (
+                <video ref={videoRef} src={currentQuestion.videoUrl} controls className="q-media q-media--video" />
+              )}
+
               {/* Timer controls */}
               <div className="timer-control">
                 {timerRemaining !== null ? (
@@ -369,10 +402,7 @@ export default function ControlPage({ toast }: Props) {
                     </span>
                     <button className="timer-stop-btn" onClick={() => startTimer(0)}>Stopp</button>
                     {timerDurMs && (
-                      <div
-                        className="timer-bar-track"
-                        title={`${timerRemaining}s verbleibend`}
-                      >
+                      <div className="timer-bar-track" title={`${timerRemaining}s verbleibend`}>
                         <div
                           className="timer-bar-fill"
                           style={{ width: `${Math.max(0, (timerRemaining / (timerDurMs / 1000)) * 100)}%` }}
@@ -488,45 +518,30 @@ export default function ControlPage({ toast }: Props) {
           )}
         </div>
 
-        {/* Scores + Cameras */}
+        {/* Scores */}
         <div className="sidebar-section sidebar-section--grow" style={{ flex: 1, overflowY: 'auto' }}>
-          <div className="sidebar-label-row">
-            <span className="sidebar-label">SCORES</span>
-            <button
-              className={`cam-toggle-btn ${camEnabled ? 'cam-on' : 'cam-off'}`}
-              onClick={toggleCam}
-              title={camEnabled ? 'Kamera ausschalten' : 'Kamera einschalten'}
-            >
-              {camEnabled ? '📷' : '📵'}
-            </button>
-          </div>
-          {/* Own camera preview when enabled */}
-          {camEnabled && myStream.current && (
-            <div className="admin-own-cam-row">
-              <div className="admin-own-cam-wrap">
-                <CamTile stream={myStream.current} name="Moderator" isSelf />
-              </div>
-              <span className="admin-own-cam-label">Du (Moderator)</span>
-            </div>
-          )}
-          {orderedPlayers.map((p) => {
-            const peer = activeCams.get(p.id);
-            return (
-              <ScoreRow
-                key={p.id}
-                playerId={p.id}
-                name={p.name}
-                score={p.score}
-                roomCode={roomCode}
-                isActive={p.id === activePlayerId}
-                delta={deltas[p.id]}
-                camStream={peer ? (peer.stream ?? null) : undefined}
-              />
-            );
-          })}
+          <div className="sidebar-label">SCORES</div>
+          {orderedPlayers.map((p) => (
+            <ScoreRow
+              key={p.id}
+              playerId={p.id}
+              name={p.name}
+              score={p.score}
+              roomCode={roomCode}
+              isActive={p.id === activePlayerId}
+              delta={deltas[p.id]}
+            />
+          ))}
           <div className="score-hint">Score anklicken zum Bearbeiten</div>
         </div>
       </aside>
+
+      {/* Image zoom lightbox */}
+      {zoomedImage && (
+        <div className="lightbox-overlay" onClick={() => setZoomedImage(null)}>
+          <img src={zoomedImage} alt="" className="lightbox-img" />
+        </div>
+      )}
     </div>
   );
 }
