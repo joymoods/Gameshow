@@ -1,4 +1,4 @@
-.PHONY: build build-admin build-player deploy up down sync-env
+.PHONY: build build-admin build-player deploy up down sync-env setup
 
 # Liest ADMIN_TOKEN aus der Root-.env (erste Zeile mit dem Key, kein Kommentar)
 ADMIN_TOKEN := $(shell grep -E '^ADMIN_TOKEN=' .env 2>/dev/null | cut -d= -f2)
@@ -8,14 +8,7 @@ ADMIN_TOKEN := $(shell grep -E '^ADMIN_TOKEN=' .env 2>/dev/null | cut -d= -f2)
 #           (überschreibt nur diesen Wert, Rest der Datei bleibt erhalten)
 # ---------------------------------------------------------------------------
 sync-env:
-	@if [ -z "$(ADMIN_TOKEN)" ]; then \
-		echo "ERROR: ADMIN_TOKEN nicht in .env gefunden."; exit 1; \
-	fi
-	@if [ -f admin-frontend/.env ]; then \
-		sed -i '/^VITE_ADMIN_TOKEN=/d' admin-frontend/.env; \
-	fi
-	@echo "VITE_ADMIN_TOKEN=$(ADMIN_TOKEN)" >> admin-frontend/.env
-	@echo "✓ VITE_ADMIN_TOKEN in admin-frontend/.env gesetzt"
+	@bash scripts/sync-env.sh
 
 # ---------------------------------------------------------------------------
 # build-admin: sync + Vite-Build des Admin-Frontends
@@ -54,3 +47,9 @@ deploy: build
 # ---------------------------------------------------------------------------
 down:
 	docker compose down
+
+# ---------------------------------------------------------------------------
+# setup: Interaktives Ersteinrichtungs-Script
+# ---------------------------------------------------------------------------
+setup:
+	@bash scripts/setup.sh

@@ -105,3 +105,28 @@
 - [ ] Persist-Option für Room-State (aktuell In-Memory; geht verloren bei Neustart)
 - [ ] Automatischer Timer-Ablauf: optionale Aktion wenn Timer auf 0 läuft
 - [ ] Testplan aktualisieren: Auth-Flow, Library, Timer, WebRTC-Abschnitte ergänzen
+
+---
+
+## Phase 9 — Media & UX Improvements ✅ (2026-05-03)
+
+### Medienwiedergabe (Fragen) ✅
+- [x] **Bild**: Click-to-zoom / Lightbox im Player- und Admin-Frontend
+- [x] **Video**: Autoplay deaktiviert; Größe erhöht (360px); Admin steuert Play/Pause via WS `MEDIA_PLAY`/`MEDIA_PAUSE` → synchrone Wiedergabe bei allen Clients
+- [x] **Sound**: Autoplay deaktiviert; Admin steuert Play/Pause via WS → synchrone Wiedergabe bei allen Clients
+- [x] WS-Protokoll: neue Messages `MEDIA_PLAY` / `MEDIA_PAUSE` (Backend: nur Admin darf senden, Broadcast an alle)
+
+### Webcam-Feature entfernt ✅
+- [x] WebRTC-Code aus Admin-Frontend, Player-Frontend und Backend vollständig entfernt
+- [x] `useWebRTC.ts` Hooks aus beiden Frontends gelöscht
+- [x] `CAM_ON`, `CAM_OFF`, `CAM_STATE`, `WEBRTC_*` aus WS-Handler/Hub/Messages entfernt
+
+### Admin-Login-Page ✅
+- [x] Eigene Route `/login` im Admin-Frontend (`LoginPage.tsx`)
+- [x] Auth wird in `localStorage` gespeichert (persistent über Sessions)
+- [x] `ProtectedRoute`-Wrapper für alle geschützten Routen
+- [x] `BrowserRouter` wrapping jetzt außerhalb der Authen-Logik
+
+### Multi-Board (offen)
+- [ ] Admin kann mehrere Quiz-Boards hintereinander in einem Room spielen (ohne Room-Reset)
+- [ ] Neues Control-Panel-Element: „Nächstes Board laden" (aus Bibliothek oder Upload)
