@@ -17,7 +17,6 @@ type Client struct {
 	PlayerID string
 	RoomCode string // room the player joined — stays valid even after room replacement
 	IsAdmin  bool
-	CamOn    bool
 	conn     *websocket.Conn
 	send     chan OutgoingMessage
 	hub      *Hub
@@ -25,16 +24,14 @@ type Client struct {
 
 // Hub manages all connected clients and broadcasting.
 type Hub struct {
-	mu        sync.RWMutex
-	clients   map[string]*Client // keyed by Client.ID
-	admin     *Client
-	camStates map[string]CamInfo // clientID → cam peer identity
+	mu      sync.RWMutex
+	clients map[string]*Client // keyed by Client.ID
+	admin   *Client
 }
 
 func NewHub() *Hub {
 	return &Hub{
-		clients:   make(map[string]*Client),
-		camStates: make(map[string]CamInfo),
+		clients: make(map[string]*Client),
 	}
 }
 
@@ -199,47 +196,6 @@ func (c *Client) Send(msg OutgoingMessage) {
 	case c.send <- msg:
 	default:
 		log.Printf("send buffer full for client %s", c.ID)
-	}
-}
-
-// RegisterCam marks a client as camera-active and returns all OTHER active cameras.
-func (h *Hub) RegisterCam(clientID, peerID, name string) []CamInfo {
-	h.mu.Lock()
-	h.camStates[clientID] = CamInfo{PeerID: peerID, Name: name}
-	others := make([]CamInfo, 0, len(h.camStates)-1)
-	for cid, info := range h.camStates {
-		if cid != clientID {
-			others = append(others, info)
-		}
-	}
-	h.mu.Unlock()
-	return others
-}
-
-// UnregisterCam removes a client from the camera registry.
-func (h *Hub) UnregisterCam(clientID string) {
-	h.mu.Lock()
-	delete(h.camStates, clientID)
-	h.mu.Unlock()
-}
-
-// GetCamStates returns all currently active cameras.
-func (h *Hub) GetCamStates() []CamInfo {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	states := make([]CamInfo, 0, len(h.camStates))
-	for _, info := range h.camStates {
-		states = append(states, info)
-	}
-	return states
-}
-
-// SendToPeer routes a message to a specific peer by peer ID ("admin" or playerID).
-func (h *Hub) SendToPeer(peerID string, msg OutgoingMessage) {
-	if peerID == "admin" {
-		h.SendToAdmin(msg)
-	} else {
-		h.SendToClient(peerID, msg)
 	}
 }
 

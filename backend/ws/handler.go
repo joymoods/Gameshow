@@ -28,8 +28,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	isAdmin := false
 	if r.URL.Query().Get("role") == "admin" {
 		token := os.Getenv("ADMIN_TOKEN")
-		auth := r.Header.Get("Authorization")
-		if token == "" || strings.TrimPrefix(auth, "Bearer ") != token {
+		// Browsers cannot set custom headers on WebSocket connections,
+		// so we accept the token via query param as well as Authorization header.
+		fromQuery := r.URL.Query().Get("token")
+		fromHeader := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if token == "" || (fromQuery != token && fromHeader != token) {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
@@ -61,19 +64,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			c.Send(buildGameState(room))
 		}
 	}
-	if cams := h.hub.GetCamStates(); len(cams) > 0 {
-		c.Send(OutgoingMessage{Type: MsgCamState, Payload: map[string]any{"cams": cams}})
-	}
 
 	defer func() {
-		// If camera was active, notify peers before unregistering.
-		if c.CamOn {
-			h.hub.Broadcast(OutgoingMessage{
-				Type:    MsgCamOff,
-				Payload: map[string]any{"from": clientPeerID(c)},
-			})
-			h.hub.UnregisterCam(clientID)
-		}
 		h.hub.Unregister(c)
 		if c.PlayerID != "" && c.RoomCode != "" {
 			room, ok := h.manager.GetRoom(c.RoomCode)
@@ -123,67 +115,16 @@ func (h *Handler) route(c *Client, msg IncomingMessage) {
 		h.handleBuzz(c)
 	case MsgPing:
 		c.Send(OutgoingMessage{Type: MsgPong, Payload: msg.Payload})
-	case MsgWebRTCOffer, MsgWebRTCAnswer, MsgWebRTCIce:
-		h.handleWebRTCRelay(c, msg)
-	case MsgCamOn:
-		h.handleCamOn(c, msg.Payload)
-	case MsgCamOff:
-		h.handleCamOff(c)
+	case MsgMediaPlay, MsgMediaPause:
+		if c.IsAdmin {
+			h.hub.Broadcast(OutgoingMessage{Type: msg.Type, Payload: msg.Payload})
+		}
 	default:
 		log.Printf("unknown message type: %s", msg.Type)
 		c.Send(OutgoingMessage{Type: MsgError, Payload: ErrorPayload{
 			Message: "unknown message type: " + msg.Type,
 		}})
 	}
-}
-
-// clientPeerID returns the peer-visible ID for signaling: "admin" or the player's UUID.
-func clientPeerID(c *Client) string {
-	if c.IsAdmin {
-		return "admin"
-	}
-	return c.PlayerID
-}
-
-func (h *Handler) handleWebRTCRelay(c *Client, msg IncomingMessage) {
-	to, _ := msg.Payload["to"].(string)
-	if to == "" {
-		return
-	}
-	msg.Payload["from"] = clientPeerID(c)
-	h.hub.SendToPeer(to, OutgoingMessage{Type: msg.Type, Payload: msg.Payload})
-}
-
-func (h *Handler) handleCamOn(c *Client, payload map[string]any) {
-	name, _ := payload["name"].(string)
-	peerID := clientPeerID(c)
-	if peerID == "" {
-		return // player hasn't joined a room yet
-	}
-	c.CamOn = true
-	others := h.hub.RegisterCam(c.ID, peerID, name)
-	h.hub.Broadcast(OutgoingMessage{
-		Type:    MsgCamOn,
-		Payload: map[string]any{"from": peerID, "name": name},
-	})
-	// Inform the enabling client about all existing cameras so it can initiate connections.
-	c.Send(OutgoingMessage{
-		Type:    MsgCamState,
-		Payload: map[string]any{"cams": others},
-	})
-}
-
-func (h *Handler) handleCamOff(c *Client) {
-	peerID := clientPeerID(c)
-	c.CamOn = false
-	h.hub.UnregisterCam(c.ID)
-	h.hub.Broadcast(OutgoingMessage{
-		Type:    MsgCamOff,
-		Payload: map[string]any{"from": peerID},
-	})
-	// Send updated cam list to the turning-off client so it can reconnect as receive-only.
-	cams := h.hub.GetCamStates()
-	c.Send(OutgoingMessage{Type: MsgCamState, Payload: map[string]any{"cams": cams}})
 }
 
 func (h *Handler) handleJoinGame(c *Client, payload map[string]any) {

@@ -92,19 +92,7 @@ const (
 	MsgTimerStarted = "TIMER_STARTED"
 	MsgTimerStopped = "TIMER_STOPPED"
 
-	// WebRTC signaling — relayed between peers
-	MsgWebRTCOffer  = "WEBRTC_OFFER"
-	MsgWebRTCAnswer = "WEBRTC_ANSWER"
-	MsgWebRTCIce    = "WEBRTC_ICE"
-
-	// Camera presence
-	MsgCamOn    = "CAM_ON"
-	MsgCamOff   = "CAM_OFF"
-	MsgCamState = "CAM_STATE"
+	// Media playback sync (admin → all clients)
+	MsgMediaPlay  = "MEDIA_PLAY"
+	MsgMediaPause = "MEDIA_PAUSE"
 )
-
-// CamInfo holds the peer-visible identity of a camera-enabled client.
-type CamInfo struct {
-	PeerID string `json:"from"`
-	Name   string `json:"name"`
-}

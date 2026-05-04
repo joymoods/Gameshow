@@ -27,11 +27,37 @@ func (ro *Router) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/rooms", ro.withCORS(ro.withAdminAuth(ro.handleRooms)))
 	mux.HandleFunc("/api/rooms/", ro.withCORS(ro.withAdminAuth(ro.handleRoomRoutes)))
 
+	// Public room info endpoint — returns only game_type and room_phase so the
+	// player join page can show the correct game logo without admin credentials.
+	mux.HandleFunc("/api/room-info/", ro.withCORS(ro.handlePublicRoomInfo))
+
 	// GET /api/library and GET /api/library/:id are intentionally public: the quiz
 	// catalog is a read-only, non-sensitive listing. All write operations (POST, PUT,
 	// DELETE) require admin auth and are checked inside the handlers (P2, P5).
 	mux.HandleFunc("/api/library", ro.withCORS(ro.handleLibraryCollection))
 	mux.HandleFunc("/api/library/", ro.withCORS(ro.handleLibraryRoutes))
+}
+
+// GET /api/room-info/:code — public, returns minimal room info for the join page.
+func (ro *Router) handlePublicRoomInfo(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	code := strings.TrimPrefix(r.URL.Path, "/api/room-info/")
+	if code == "" {
+		writeError(w, http.StatusBadRequest, "missing room code")
+		return
+	}
+	room, ok := ro.manager.GetRoom(code)
+	if !ok {
+		writeError(w, http.StatusNotFound, "room not found")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{
+		"game_type":  string(room.GameType),
+		"room_phase": string(room.Phase),
+	})
 }
 
 func (ro *Router) withCORS(next http.HandlerFunc) http.HandlerFunc {
