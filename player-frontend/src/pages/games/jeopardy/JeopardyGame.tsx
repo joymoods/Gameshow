@@ -3,7 +3,6 @@ import { useGameStore } from '../../../store/gameStore';
 import { buzz } from '../../../ws/socket';
 import { playBuzz, playCorrect, playWrong } from '../../../audio';
 import { getGameLogo } from '../../../utils/gameLogos';
-import { useWebRTC } from '../../../hooks/useWebRTC';
 
 const BACKEND = import.meta.env.VITE_API_URL ?? `${window.location.protocol}//${window.location.hostname}`;
 
@@ -18,32 +17,6 @@ interface ScoreDelta {
   key: number;
 }
 
-function CamTile({ stream, name, isSelf }: { stream: MediaStream | null; name: string; isSelf: boolean }) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  useEffect(() => {
-    if (videoRef.current && stream) {
-      videoRef.current.srcObject = stream;
-    }
-  }, [stream]);
-
-  if (!stream) {
-    return (
-      <div className="cam-tile cam-tile--avatar">
-        <span className="cam-tile-initial">{name[0]?.toUpperCase() ?? '?'}</span>
-      </div>
-    );
-  }
-  return (
-    <video
-      ref={videoRef}
-      autoPlay
-      playsInline
-      muted={isSelf}
-      className={`cam-tile cam-tile--video${isSelf ? ' cam-tile--mirrored' : ''}`}
-    />
-  );
-}
-
 export default function JeopardyGame() {
   const {
     phase, board, players, playerOrder,
@@ -56,9 +29,9 @@ export default function JeopardyGame() {
     lastAnswerResult,
     gameType,
     timerEndsAt, timerDurMs,
+    mediaPlaying,
   } = useGameStore();
   const gameLogo = getGameLogo(gameType);
-  const { camEnabled, activeCams, myStream, toggleCam } = useWebRTC(myPlayerId, myPlayerName);
 
   const [deltas, setDeltas] = useState<Record<string, ScoreDelta>>({});
   const prevScores = useRef<Record<string, number>>({});
@@ -75,15 +48,43 @@ export default function JeopardyGame() {
     return () => clearInterval(id);
   }, [timerEndsAt]);
 
+  // Image zoom state
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+
+  // Media element refs for sync
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  // Sync media playback state from store
+  useEffect(() => {
+    if (mediaPlaying) {
+      videoRef.current?.play().catch(() => {});
+      audioRef.current?.play().catch(() => {});
+    } else {
+      videoRef.current?.pause();
+      audioRef.current?.pause();
+    }
+  }, [mediaPlaying]);
+
+  // Reset media when question changes
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.currentTime = 0;
+    }
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+  }, [currentQuestion?.questionId]);
+
   type AnswerFeedback = 'correct' | 'wrong' | 'correct-stay' | null;
   const [answerFeedback, setAnswerFeedback] = useState<AnswerFeedback>(null);
 
-  // Reset feedback when a new question opens
   useEffect(() => {
     setAnswerFeedback(null);
   }, [currentQuestion?.questionId]);
 
-  // Handle answer result feedback animation
   useEffect(() => {
     if (!lastAnswerResult) { setAnswerFeedback(null); return; }
     if (lastAnswerResult.correct) {
@@ -97,7 +98,6 @@ export default function JeopardyGame() {
     }
   }, [lastAnswerResult]);
 
-  // Detect score changes and trigger delta animation
   useEffect(() => {
     players.forEach((p) => {
       const prev = prevScores.current[p.id];
@@ -111,12 +111,10 @@ export default function JeopardyGame() {
     prevScores.current = Object.fromEntries(players.map((p) => [p.id, p.score]));
   }, [players]);
 
-  // Sound: buzzer opens → play buzz for eligible players
   useEffect(() => {
     if (buzzerOpen && !hasBuzzed) playBuzz();
   }, [buzzerOpen]);  // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Sound: answer result
   useEffect(() => {
     if (!lastAnswerResult) return;
     if (lastAnswerResult.playerId === myPlayerId) {
@@ -189,6 +187,10 @@ export default function JeopardyGame() {
 
   const numRows = board.length > 0 ? Math.max(...board.map((c) => c.questions.length)) : 5;
 
+  const imgUrl = mediaUrl(currentQuestion?.imageUrl);
+  const audUrl = mediaUrl(currentQuestion?.audioUrl);
+  const vidUrl = mediaUrl(currentQuestion?.videoUrl);
+
   return (
     <div className="game-page">
       {/* Board area */}
@@ -225,38 +227,15 @@ export default function JeopardyGame() {
 
         {/* Player strip */}
         <div className="player-strip">
-          {/* Admin camera tile */}
-          {activeCams.has('admin') && (
-            <div className="player-strip-card">
-              <div className="player-strip-cam">
-                <CamTile
-                  stream={activeCams.get('admin')!.stream}
-                  name={activeCams.get('admin')!.name || 'Moderator'}
-                  isSelf={false}
-                />
-              </div>
-              <div className="player-strip-bottom">
-                <div className="player-strip-name other">Moderator</div>
-              </div>
-            </div>
-          )}
-
           {orderedPlayers.map((p) => {
             const isActive = p.id === activePlayerId;
             const isMe = p.id === myPlayerId;
             const cardClass = isMe ? 'is-me' : isActive ? 'is-active' : '';
-            const peerCam = isMe
-              ? (camEnabled ? { stream: myStream.current, name: p.name } : null)
-              : activeCams.get(p.id) ?? null;
             return (
               <div key={p.id} className={`player-strip-card ${cardClass}`}>
                 {isActive && <div className="player-strip-active-label">● DRAN</div>}
-                <div className="player-strip-cam">
-                  <CamTile
-                    stream={peerCam?.stream ?? null}
-                    name={p.name}
-                    isSelf={isMe}
-                  />
+                <div className="player-strip-avatar">
+                  {p.name[0]?.toUpperCase() ?? '?'}
                 </div>
                 <div className="player-strip-bottom">
                   <div className={`player-strip-name ${isMe ? 'is-me' : 'other'}`}>{p.name}</div>
@@ -272,22 +251,12 @@ export default function JeopardyGame() {
               </div>
             );
           })}
-
-          {/* Camera toggle button */}
-          <button
-            className={`cam-toggle-btn ${camEnabled ? 'cam-on' : 'cam-off'}`}
-            onClick={toggleCam}
-            title={camEnabled ? 'Kamera ausschalten' : 'Kamera einschalten'}
-          >
-            {camEnabled ? '📷' : '📵'}
-          </button>
         </div>
       </div>
 
       {/* Question overlay */}
       {showOverlay && (
         <div className="question-overlay">
-          {/* Buzzer — absolute top-right */}
           {showBuzzerSection && (
             <div className="buzzer-wrapper">
               <div className="buzzer-relative">
@@ -325,14 +294,31 @@ export default function JeopardyGame() {
                   </div>
                 </div>
                 <h2 className="overlay-question-text">{currentQuestion!.text}</h2>
-                {mediaUrl(currentQuestion!.imageUrl) && (
-                  <img src={mediaUrl(currentQuestion!.imageUrl)} alt="" style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 8 }} />
+                {imgUrl && (
+                  <img
+                    src={imgUrl}
+                    alt=""
+                    className="q-media q-media--zoomable"
+                    onClick={() => setZoomedImage(imgUrl)}
+                    title="Klicken zum Vergrößern"
+                  />
                 )}
-                {mediaUrl(currentQuestion!.audioUrl) && (
-                  <audio src={mediaUrl(currentQuestion!.audioUrl)} controls autoPlay />
+                {audUrl && (
+                  <audio
+                    ref={audioRef}
+                    src={audUrl}
+                    controls
+                    className="q-media"
+                    style={{ width: '100%' }}
+                  />
                 )}
-                {mediaUrl(currentQuestion!.videoUrl) && (
-                  <video src={mediaUrl(currentQuestion!.videoUrl)} controls autoPlay style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 8 }} />
+                {vidUrl && (
+                  <video
+                    ref={videoRef}
+                    src={vidUrl}
+                    controls
+                    className="q-media q-media--video"
+                  />
                 )}
               </div>
 
@@ -365,9 +351,18 @@ export default function JeopardyGame() {
               )}
             </div>
           </div>
-
         </div>
       )}
+
+      {/* Image zoom lightbox */}
+      {zoomedImage && (
+        <div className="lightbox-overlay" onClick={() => setZoomedImage(null)}>
+          <img src={zoomedImage} alt="" className="lightbox-img" />
+        </div>
+      )}
+
+      {/* Name display */}
+      <div className="player-name-badge">{myPlayerName}</div>
     </div>
   );
 }

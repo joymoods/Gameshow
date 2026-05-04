@@ -4,7 +4,7 @@ import { connect } from '../ws/socket';
 import { useGameStore } from '../store/gameStore';
 import { getGameLogo } from '../utils/gameLogos';
 
-const API = import.meta.env.VITE_API_URL ?? `${window.location.protocol}//${window.location.hostname}`;
+const API = import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}`;
 
 export default function JoinPage() {
   const navigate = useNavigate();
@@ -22,7 +22,6 @@ export default function JoinPage() {
     if (joinError) return joinError;
     return '';
   });
-  const [loading, setLoading] = useState(false);
   const [gameLogo, setGameLogo] = useState<string | null>(null);
   const [logoLoading, setLogoLoading] = useState(false);
   const codeRef = useRef<HTMLInputElement>(null);
@@ -41,7 +40,7 @@ export default function JoinPage() {
     }
     let cancelled = false;
     setLogoLoading(true);
-    fetch(`${API}/api/rooms/${code}`)
+    fetch(`${API}/api/room-info/${code}`)
       .then((res) => res.ok ? res.json() : null)
       .then((data) => {
         if (cancelled) return;
@@ -67,19 +66,9 @@ export default function JoinPage() {
   async function submit() {
     if (!codeOk) { setErr('Room-Code muss genau 6 Zeichen lang sein'); return; }
     if (!nameOk) { setErr('Bitte gib deinen Namen ein'); return; }
-    setLoading(true);
-    setErr('');
-    try {
-      const res = await fetch(`${API}/api/rooms/${code}`);
-      if (!res.ok) { setErr('Room nicht gefunden'); return; }
-      setIdentity('', name.trim());
-      connect(code, name.trim());
-      navigate('/waiting');
-    } catch {
-      setErr('Verbindung fehlgeschlagen');
-    } finally {
-      setLoading(false);
-    }
+    setIdentity('', name.trim());
+    connect(code, name.trim());
+    navigate('/waiting');
   }
 
   return (
@@ -136,18 +125,10 @@ export default function JoinPage() {
           {err && <div className="join-error">{err}</div>}
 
           <button
-            className={`join-submit ${loading ? 'loading' : 'ready'}`}
+            className="join-submit ready"
             onClick={submit}
-            disabled={loading}
           >
-            {loading ? (
-              <>
-                <div className="join-spinner" />
-                Verbinde…
-              </>
-            ) : (
-              'Beitreten'
-            )}
+            Beitreten
           </button>
         </div>
       </div>

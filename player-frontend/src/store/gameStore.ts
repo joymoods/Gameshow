@@ -66,6 +66,9 @@ interface GameState {
   timerEndsAt: number | null;
   timerDurMs: number | null;
 
+  // Media sync (admin-controlled)
+  mediaPlaying: boolean;
+
   // Actions
   setConnected: (v: boolean) => void;
   setIdentity: (id: string, name: string) => void;
@@ -101,6 +104,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   joinError: null,
   timerEndsAt: null,
   timerDurMs: null,
+  mediaPlaying: false,
 
   setConnected: (connected) => set({ connected }),
 
@@ -162,6 +166,7 @@ export const useGameStore = create<GameState>((set, get) => ({
           lastAnswerResult: null,
           timerEndsAt: null,
           timerDurMs: null,
+          mediaPlaying: false,
         });
         break;
       }
@@ -280,6 +285,16 @@ export const useGameStore = create<GameState>((set, get) => ({
 
       case MSG.TIMER_STOPPED: {
         set({ timerEndsAt: null, timerDurMs: null });
+        break;
+      }
+
+      case MSG.MEDIA_PLAY: {
+        set({ mediaPlaying: true });
+        break;
+      }
+
+      case MSG.MEDIA_PAUSE: {
+        set({ mediaPlaying: false });
         break;
       }
 

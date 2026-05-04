@@ -438,36 +438,48 @@ input { font-family: inherit; outline: none; transition: border-color 0.2s, box-
 .player-strip {
   display: flex;
   gap: 8px;
-  padding: 10px 18px;
+  padding: 8px 18px;
   background: var(--bg);
   border-top: 1px solid var(--border);
   flex-shrink: 0;
-  height: 280px;
+  height: 100px;
   justify-content: center;
+  align-items: center;
 }
 .player-strip-card {
   flex: 1;
   border: 2px solid var(--border);
   border-radius: 10px;
   background: var(--surface);
-  padding: 8px 10px 10px;
+  padding: 6px 10px 8px;
   text-align: center;
   transition: all 0.2s;
-  max-width: calc((280px - 20px) * 16 / 9);
+  max-width: 120px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-height: 0;
+  gap: 4px;
 }
 .player-strip-card.is-active { border-color: var(--success); box-shadow: 0 0 14px rgba(34,197,94,0.25); }
 .player-strip-card.is-me     { border-color: var(--primary); box-shadow: 0 0 10px rgba(79,110,247,0.2); }
 .player-strip-active-label { font-size: 9px; color: var(--success); font-weight: 700; letter-spacing: 1px; flex-shrink: 0; }
-.player-strip-cam { flex: 1; width: 100%; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 6px; background: var(--surface2); }
-.player-strip-bottom { display: inline-flex; flex-direction: row; align-items: center; gap: 8px; flex-shrink: 0; border: 1px solid var(--border); border-radius: 7px; padding: 5px 10px; background: var(--bg); max-width: 100%; }
-.player-strip-name { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.player-strip-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--surface2);
+  color: var(--text-muted);
+  font-size: 18px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.player-strip-bottom { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; flex-shrink: 0; max-width: 100%; }
+.player-strip-name { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70px; }
 .player-strip-name.is-me { font-weight: 700; color: var(--text); }
 .player-strip-name.other { color: var(--text-muted); }
-.player-strip-score { font-size: 16px; font-weight: 800; display: inline-block; position: relative; }
+.player-strip-score { font-size: 15px; font-weight: 800; display: inline-block; position: relative; }
 .player-strip-score.positive { color: var(--gold); }
 .player-strip-score.negative { color: var(--danger); }
 .player-strip-delta {
@@ -483,55 +495,13 @@ input { font-family: inherit; outline: none; transition: border-color 0.2s, box-
 .player-strip-delta.positive { color: var(--success); }
 .player-strip-delta.negative { color: var(--danger); }
 
-/* ---- Camera tiles ---- */
-.cam-tile {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 6px;
-}
-.cam-tile--video { display: block; }
-.cam-tile--mirrored { transform: scaleX(-1); }
-.cam-tile--avatar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--surface2);
-  color: var(--text-muted);
-  font-size: 36px;
-  font-weight: 700;
-  border-radius: 6px;
-  width: 100%;
-  height: 100%;
-}
-.cam-tile-initial { line-height: 1; }
-
-/* Camera toggle button in player strip */
-.cam-toggle-btn {
-  align-self: center;
-  flex-shrink: 0;
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  border: none;
-  font-size: 20px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-}
-.cam-toggle-btn.cam-off { background: var(--surface2); }
-.cam-toggle-btn.cam-on  { background: rgba(79,110,247,0.2); border: 2px solid var(--primary); }
-.cam-toggle-btn:hover   { transform: scale(1.1); }
-
 /* Question overlay */
 .question-overlay {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  bottom: 280px;
+  bottom: 100px;
   background: rgba(5,7,14,0.96);
   display: flex;
   flex-direction: column;
@@ -805,11 +775,13 @@ input { font-family: inherit; outline: none; transition: border-color 0.2s, box-
     flex-direction: column;
     padding: 6px 4px;
     min-width: unset;
+    max-width: 72px;
     width: 72px;
     text-align: center;
   }
   .player-strip-name { font-size: 10px; }
   .player-strip-score { font-size: 13px; }
+  .player-name-badge { display: none; }
 
   .game-board-header { padding: 4px 8px; }
   .game-board-label { font-size: 10px; }
@@ -860,4 +832,45 @@ input { font-family: inherit; outline: none; transition: border-color 0.2s, box-
 @keyframes timerPulse {
   from { opacity: 1; transform: scale(1); }
   to   { opacity: 0.7; transform: scale(1.08); }
+}
+
+/* ---- Media in overlay ---- */
+.q-media--zoomable { cursor: zoom-in; transition: opacity 0.15s; }
+.q-media--zoomable:hover { opacity: 0.85; }
+.q-media--video { max-width: 100%; max-height: 360px; border-radius: 8px; margin-top: 10px; display: block; width: 100%; }
+
+/* ---- Image zoom lightbox ---- */
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0,0,0,0.92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+  animation: fadeInFast 0.15s ease;
+}
+.lightbox-img {
+  max-width: 95vw;
+  max-height: 92vh;
+  border-radius: 8px;
+  object-fit: contain;
+  box-shadow: 0 8px 48px rgba(0,0,0,0.6);
+}
+
+/* ---- Player name badge ---- */
+.player-name-badge {
+  position: fixed;
+  bottom: 108px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 4px 14px;
+  font-size: 11px;
+  color: var(--text-muted);
+  pointer-events: none;
+  z-index: 10;
 }
