@@ -30,6 +30,7 @@ export default function JeopardyGame() {
     gameType,
     timerEndsAt, timerDurMs,
     mediaPlaying,
+    mediaSeekTime, mediaSeekSeq,
   } = useGameStore();
   const gameLogo = getGameLogo(gameType);
 
@@ -55,27 +56,82 @@ export default function JeopardyGame() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  // Sync media playback state from store
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
+
+  // Player-controllable: volume only (play/pause/seek stays admin-only)
+  const [mediaVolume, setMediaVolume] = useState(1);
+  const [mediaProgress, setMediaProgress] = useState(0);   // 0–1
+  const [mediaDuration, setMediaDuration] = useState(0);
+
+  function handleVolumeChange(val: number) {
+    setMediaVolume(val);
+    if (videoRef.current) videoRef.current.volume = val;
+    if (audioRef.current) audioRef.current.volume = val;
+  }
+
+  function handleTimeUpdate(el: HTMLVideoElement | HTMLAudioElement) {
+    if (el.duration) setMediaProgress(el.currentTime / el.duration);
+    setMediaDuration(el.duration || 0);
+  }
+
+  function enterFullscreen() {
+    videoRef.current?.requestFullscreen().catch(() => {});
+  }
+
+  function fmtTime(s: number) {
+    if (!isFinite(s)) return '0:00';
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}:${sec.toString().padStart(2, '0')}`;
+  }
+
+  // Called from onCanPlay — syncs volume and starts playback if admin already sent MEDIA_PLAY.
+  // This handles the race where MEDIA_PLAY arrives before the element is ready to play.
+  function onMediaCanPlay(el: HTMLVideoElement | HTMLAudioElement | null) {
+    if (!el) return;
+    el.volume = mediaVolume;
+    if (useGameStore.getState().mediaPlaying) {
+      el.muted = false;
+      el.play().catch(() => setAutoplayBlocked(true));
+    }
+  }
+
+  // Sync media playback state received from admin via WS
   useEffect(() => {
-    if (mediaPlaying) {
-      videoRef.current?.play().catch(() => {});
-      audioRef.current?.play().catch(() => {});
-    } else {
+    if (!mediaPlaying) {
       videoRef.current?.pause();
       audioRef.current?.pause();
+      setAutoplayBlocked(false);
+      return;
     }
-  }, [mediaPlaying]);
+    const tryPlay = (el: HTMLVideoElement | HTMLAudioElement | null) => {
+      if (!el) return;
+      el.muted = false;
+      el.volume = mediaVolume;
+      el.play().catch(() => setAutoplayBlocked(true));
+    };
+    tryPlay(videoRef.current);
+    tryPlay(audioRef.current);
+  }, [mediaPlaying]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync seek position from admin
+  useEffect(() => {
+    if (mediaSeekTime === null) return;
+    if (videoRef.current) videoRef.current.currentTime = mediaSeekTime;
+    if (audioRef.current) audioRef.current.currentTime = mediaSeekTime;
+  }, [mediaSeekSeq]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handleManualPlay() {
+    videoRef.current?.play().catch(() => {});
+    audioRef.current?.play().catch(() => {});
+    setAutoplayBlocked(false);
+  }
 
   // Reset media when question changes
   useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.pause();
-      videoRef.current.currentTime = 0;
-    }
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-    }
+    setAutoplayBlocked(false);
+    if (videoRef.current) { videoRef.current.pause(); videoRef.current.currentTime = 0; }
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
   }, [currentQuestion?.questionId]);
 
   type AnswerFeedback = 'correct' | 'wrong' | 'correct-stay' | null;
@@ -307,18 +363,54 @@ export default function JeopardyGame() {
                   <audio
                     ref={audioRef}
                     src={audUrl}
-                    controls
-                    className="q-media"
-                    style={{ width: '100%' }}
+                    loop
+                    onCanPlay={() => onMediaCanPlay(audioRef.current)}
+                    onTimeUpdate={() => handleTimeUpdate(audioRef.current!)}
+                    onDurationChange={() => setMediaDuration(audioRef.current?.duration || 0)}
                   />
                 )}
                 {vidUrl && (
                   <video
                     ref={videoRef}
                     src={vidUrl}
-                    controls
+                    loop
                     className="q-media q-media--video"
+                    onCanPlay={() => onMediaCanPlay(videoRef.current)}
+                    onTimeUpdate={() => handleTimeUpdate(videoRef.current!)}
+                    onDurationChange={() => setMediaDuration(videoRef.current?.duration || 0)}
                   />
+                )}
+                {(audUrl || vidUrl) && (
+                  <div className="player-media-controls">
+                    <div className="player-media-progress-row">
+                      <div className="player-media-progress-bar">
+                        <div className="player-media-progress-fill" style={{ width: `${mediaProgress * 100}%` }} />
+                      </div>
+                      <span className="player-media-time">
+                        {fmtTime((mediaProgress * mediaDuration))} / {fmtTime(mediaDuration)}
+                      </span>
+                    </div>
+                    <div className="player-media-vol-row">
+                      <span className="player-media-vol-icon">{mediaVolume === 0 ? '🔇' : '🔊'}</span>
+                      <input
+                        type="range"
+                        className="player-media-vol-slider"
+                        min={0} max={1} step={0.02}
+                        value={mediaVolume}
+                        onChange={(e) => handleVolumeChange(Number(e.target.value))}
+                      />
+                      {vidUrl && (
+                        <button className="player-media-fs-btn" onClick={enterFullscreen} title="Vollbild">
+                          ⛶
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {mediaPlaying && autoplayBlocked && (
+                  <button className="autoplay-unblock-btn" onClick={handleManualPlay}>
+                    ▶ Abspielen
+                  </button>
                 )}
               </div>
 

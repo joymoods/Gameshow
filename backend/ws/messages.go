@@ -95,4 +95,5 @@ const (
 	// Media playback sync (admin → all clients)
 	MsgMediaPlay  = "MEDIA_PLAY"
 	MsgMediaPause = "MEDIA_PAUSE"
+	MsgMediaSeek  = "MEDIA_SEEK"
 )

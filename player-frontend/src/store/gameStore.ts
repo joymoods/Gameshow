@@ -68,6 +68,8 @@ interface GameState {
 
   // Media sync (admin-controlled)
   mediaPlaying: boolean;
+  mediaSeekTime: number | null;
+  mediaSeekSeq: number;
 
   // Actions
   setConnected: (v: boolean) => void;
@@ -105,6 +107,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   timerEndsAt: null,
   timerDurMs: null,
   mediaPlaying: false,
+  mediaSeekTime: null,
+  mediaSeekSeq: 0,
 
   setConnected: (connected) => set({ connected }),
 
@@ -167,6 +171,8 @@ export const useGameStore = create<GameState>((set, get) => ({
           timerEndsAt: null,
           timerDurMs: null,
           mediaPlaying: false,
+          mediaSeekTime: null,
+          mediaSeekSeq: 0,
         });
         break;
       }
@@ -295,6 +301,12 @@ export const useGameStore = create<GameState>((set, get) => ({
 
       case MSG.MEDIA_PAUSE: {
         set({ mediaPlaying: false });
+        break;
+      }
+
+      case MSG.MEDIA_SEEK: {
+        const p = msg.payload as { time: number };
+        set({ mediaSeekTime: p.time, mediaSeekSeq: (get().mediaSeekSeq ?? 0) + 1 });
         break;
       }
 

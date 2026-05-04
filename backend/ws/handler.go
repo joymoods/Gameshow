@@ -115,7 +115,7 @@ func (h *Handler) route(c *Client, msg IncomingMessage) {
 		h.handleBuzz(c)
 	case MsgPing:
 		c.Send(OutgoingMessage{Type: MsgPong, Payload: msg.Payload})
-	case MsgMediaPlay, MsgMediaPause:
+	case MsgMediaPlay, MsgMediaPause, MsgMediaSeek:
 		if c.IsAdmin {
 			h.hub.Broadcast(OutgoingMessage{Type: msg.Type, Payload: msg.Payload})
 		}

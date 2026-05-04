@@ -124,7 +124,7 @@ export default function ControlPage({ toast }: Props) {
     }
   }, [mediaPlaying]);
 
-  // Receive MEDIA_PLAY/PAUSE from server (echoed back to admin too)
+  // Receive MEDIA_PLAY/PAUSE/SEEK from server (echoed back to admin too)
   useEffect(() => {
     return addMessageListener((msg) => {
       if (msg.type === 'MEDIA_PLAY') setMediaPlaying(true);
@@ -136,6 +136,10 @@ export default function ControlPage({ toast }: Props) {
     const next = !mediaPlaying;
     send(next ? 'MEDIA_PLAY' : 'MEDIA_PAUSE', {});
     // State will be updated via the echoed WS message
+  }
+
+  function handleAdminSeeked(el: HTMLVideoElement | HTMLAudioElement) {
+    send('MEDIA_SEEK', { time: el.currentTime });
   }
 
   // Timer countdown
@@ -386,10 +390,12 @@ export default function ControlPage({ toast }: Props) {
               )}
 
               {currentQuestion.audioUrl && (
-                <audio ref={audioRef} src={currentQuestion.audioUrl} controls className="q-media" style={{ width: '100%' }} />
+                <audio ref={audioRef} src={currentQuestion.audioUrl} controls loop className="q-media" style={{ width: '100%' }}
+                  onSeeked={() => handleAdminSeeked(audioRef.current!)} />
               )}
               {currentQuestion.videoUrl && (
-                <video ref={videoRef} src={currentQuestion.videoUrl} controls className="q-media q-media--video" />
+                <video ref={videoRef} src={currentQuestion.videoUrl} controls loop className="q-media q-media--video"
+                  onSeeked={() => handleAdminSeeked(videoRef.current!)} />
               )}
 
               {/* Timer controls */}
