@@ -225,6 +225,11 @@ export const useGameStore = create<GameState>((set) => ({
         break;
       }
 
+      case MSG.BOARD_COMPLETE: {
+        set({ phase: 'BOARD_COMPLETE', currentQuestion: null, timerEndsAt: null, timerDurMs: null });
+        break;
+      }
+
       case MSG.GAME_OVER: {
         const p = msg.payload as { finalScores: Player[] };
         set({ phase: 'GAME_OVER', finalScores: p.finalScores });

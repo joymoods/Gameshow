@@ -424,16 +424,15 @@ func (ro *Router) handleCloseQuestion(w http.ResponseWriter, _ *http.Request, ro
 	}
 	res := result.(map[string]any)
 	questionID, _ := res["questionId"].(string)
-	gameOver, _ := res["gameOver"].(bool)
+	boardComplete, _ := res["boardComplete"].(bool)
 	activePlayer, _ := res["activePlayer"].(*core.Player)
 
 	if questionID != "" {
 		ro.wsHandler.BroadcastBoardUpdate(questionID)
 	}
-	if gameOver {
-		room.SetPhase(core.RoomPhaseGameOver)
-		snap := room.Snapshot()
-		ro.wsHandler.BroadcastGameOver(snap.Scores)
+	if boardComplete {
+		ro.wsHandler.BroadcastBoardComplete()
+		ro.wsHandler.BroadcastGameState(room)
 	} else {
 		ro.wsHandler.BroadcastGameState(room)
 		if activePlayer != nil {

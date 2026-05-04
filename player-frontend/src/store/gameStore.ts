@@ -249,6 +249,21 @@ export const useGameStore = create<GameState>((set, get) => ({
         break;
       }
 
+      case MSG.BOARD_COMPLETE: {
+        set({
+          phase: 'BOARD_COMPLETE',
+          currentQuestion: null,
+          buzzerOpen: false,
+          hasBuzzed: false,
+          buzzedPlayerId: null,
+          buzzedPlayerName: null,
+          timerEndsAt: null,
+          timerDurMs: null,
+          revealedAnswer: null,
+        });
+        break;
+      }
+
       case MSG.GAME_OVER: {
         const p = msg.payload as { finalScores: Player[] };
         set({ phase: 'GAME_OVER', roomPhase: 'GAME_OVER', finalScores: p.finalScores, buzzerOpen: false });

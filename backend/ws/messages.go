@@ -74,6 +74,7 @@ const (
 	MsgAnswerRevealed = "ANSWER_REVEALED"
 	MsgBoardUpdate    = "BOARD_UPDATE"
 	MsgGameOver       = "GAME_OVER"
+	MsgBoardComplete  = "BOARD_COMPLETE"
 
 	// Server → Admin only
 	MsgPlayerJoined = "PLAYER_JOINED"

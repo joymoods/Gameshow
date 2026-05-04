@@ -127,6 +127,8 @@
 - [x] `ProtectedRoute`-Wrapper für alle geschützten Routen
 - [x] `BrowserRouter` wrapping jetzt außerhalb der Authen-Logik
 
-### Multi-Board (offen)
-- [ ] Admin kann mehrere Quiz-Boards hintereinander in einem Room spielen (ohne Room-Reset)
-- [ ] Neues Control-Panel-Element: „Nächstes Board laden" (aus Bibliothek oder Upload)
+### Multi-Board ✅ (2026-05-04)
+- [x] Admin kann mehrere Quiz-Boards hintereinander in einem Room spielen (ohne Room-Reset)
+- [x] Neues Control-Panel-Element: „Nächstes Board laden" (aus Bibliothek) + „Spiel beenden"
+- [x] Backend: neue Jeopardy-Phase `BOARD_COMPLETE` ersetzt auto-GameOver; `load_quiz` setzt Phase zurück
+- [x] WS-Message `BOARD_COMPLETE` → Spieler sehen Wartescreen, Admin sieht Board-Auswahl

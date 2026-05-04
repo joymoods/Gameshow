@@ -11,4 +11,5 @@ const (
 	PhaseBuzzerPhase           JeopardyPhase = "BUZZER_PHASE"
 	PhaseQuestionDone          JeopardyPhase = "QUESTION_DONE"
 	PhaseGameOver              JeopardyPhase = "GAME_OVER"
+	PhaseBoardComplete         JeopardyPhase = "BOARD_COMPLETE"
 )

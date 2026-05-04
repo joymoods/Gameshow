@@ -203,7 +203,8 @@ export default function JeopardyGame() {
 
   const feedbackClass = answerFeedback ? `feedback-${answerFeedback}` : '';
 
-  const showOverlay = currentQuestion !== null;
+  const showBoardCompleteOverlay = phase === 'BOARD_COMPLETE';
+  const showOverlay = currentQuestion !== null && !showBoardCompleteOverlay;
   const amActive = myPlayerId === activePlayerId;
   const iBuzzed = hasBuzzed && buzzedPlayerId === myPlayerId;
   const otherBuzzed = buzzedPlayerId && buzzedPlayerId !== myPlayerId;
@@ -441,6 +442,21 @@ export default function JeopardyGame() {
               {revealedAnswer && (
                 <div className="overlay-revealed-answer">{revealedAnswer}</div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Board complete overlay */}
+      {showBoardCompleteOverlay && (
+        <div className="question-overlay" style={{ background: 'rgba(10,10,20,0.92)' }}>
+          <div className="overlay-question-area" style={{ justifyContent: 'center' }}>
+            <div className="overlay-main-card" style={{ textAlign: 'center', padding: '40px 32px' }}>
+              <div style={{ fontSize: 56, marginBottom: 16 }}>🏁</div>
+              <h2 style={{ margin: '0 0 8px', fontSize: 24, color: 'var(--text)' }}>Board abgeschlossen!</h2>
+              <p style={{ color: 'var(--text-muted)', fontSize: 15, margin: 0 }}>
+                Der Moderator lädt gleich das nächste Board…
+              </p>
             </div>
           </div>
         </div>

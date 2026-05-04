@@ -148,6 +148,14 @@ func (j *JeopardyGame) loadQuiz(payload map[string]any) (any, error) {
 		}
 	}
 	j.categories = cats
+	j.currentQuestion = nil
+	j.buzzedPlayers = make(map[string]bool)
+	j.buzzedPlayerID = ""
+	j.timerEndsAt = 0
+	j.timerDurMs = 0
+	if j.phase == PhaseBoardComplete {
+		j.phase = PhaseQuestionOpen
+	}
 	return map[string]any{"status": "ok"}, nil
 }
 
@@ -254,9 +262,9 @@ func (j *JeopardyGame) closeQuestion() (any, error) {
 	j.timerEndsAt = 0
 	j.timerDurMs = 0
 
-	gameOver := j.allQuestionsPlayed()
+	boardComplete := j.allQuestionsPlayed()
 	var activePlayer *core.Player
-	if !gameOver {
+	if !boardComplete {
 		if j.room != nil {
 			// NextActivePlayer + ActivePlayer each acquire room.mu — no j.mu nesting.
 			j.room.NextActivePlayer()
@@ -264,13 +272,13 @@ func (j *JeopardyGame) closeQuestion() (any, error) {
 		}
 		j.phase = PhaseQuestionOpen
 	} else {
-		j.phase = PhaseGameOver
+		j.phase = PhaseBoardComplete
 	}
 
 	return map[string]any{
-		"questionId":   questionID,
-		"gameOver":     gameOver,
-		"activePlayer": activePlayer,
+		"questionId":    questionID,
+		"boardComplete": boardComplete,
+		"activePlayer":  activePlayer,
 	}, nil
 }
 

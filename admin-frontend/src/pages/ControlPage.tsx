@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useGameStore } from '../store/gameStore';
 import type { Question } from '../types';
+import type { QuizSummary } from '../types/library';
 import type { ToastType } from '../App';
 import { API, apiFetch } from '../api/client';
+import { listQuizzes, loadQuizFromLibrary } from '../api/library';
 import { send, addMessageListener } from '../ws/socket';
 
 interface ScoreDelta {
@@ -94,6 +96,11 @@ export default function ControlPage({ toast }: Props) {
   const [answerBroadcast, setAnswerBroadcast] = useState(false);
   const [deltas, setDeltas] = useState<Record<string, ScoreDelta>>({});
 
+  // Multi-Board state
+  const [libraryQuizzes, setLibraryQuizzes] = useState<QuizSummary[]>([]);
+  const [loadingLibrary, setLoadingLibrary] = useState(false);
+  const [loadingBoard, setLoadingBoard] = useState(false);
+
   // Media state
   const [mediaPlaying, setMediaPlaying] = useState(false);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
@@ -169,6 +176,36 @@ export default function ControlPage({ toast }: Props) {
     const key = Date.now();
     setDeltas((d) => ({ ...d, [pid]: { val, key } }));
     setTimeout(() => setDeltas((d) => { const n = { ...d }; delete n[pid]; return n; }), 1800);
+  }
+
+  async function fetchLibraryForNextBoard() {
+    setLoadingLibrary(true);
+    try {
+      const quizzes = await listQuizzes();
+      setLibraryQuizzes(quizzes);
+    } catch {
+      toast('Bibliothek konnte nicht geladen werden', 'error');
+    } finally {
+      setLoadingLibrary(false);
+    }
+  }
+
+  async function loadNextBoardFromLibrary(quizId: string) {
+    setLoadingBoard(true);
+    try {
+      await loadQuizFromLibrary(roomCode, quizId);
+      setLibraryQuizzes([]);
+      toast('Neues Board geladen', 'success');
+    } catch {
+      toast('Board konnte nicht geladen werden', 'error');
+    } finally {
+      setLoadingBoard(false);
+    }
+  }
+
+  async function endGameNow() {
+    await apiFetch(`${API}/api/rooms/${roomCode}/end`, { method: 'POST' });
+    toast('Spiel beendet', 'info');
   }
 
   async function openQuestion(q: Question) {
@@ -261,6 +298,58 @@ export default function ControlPage({ toast }: Props) {
     return (
       <div style={{ padding: 24 }}>
         <p>Kein aktiver Room. <a href="/admin" style={{ color: 'var(--primary)' }}>Zurück</a></p>
+      </div>
+    );
+  }
+
+  if (phase === 'BOARD_COMPLETE') {
+    const sorted = [...players].sort((a, b) => b.score - a.score);
+    return (
+      <div className="gameover-page">
+        <div className="gameover-trophy">🏁</div>
+        <h1>Board abgeschlossen!</h1>
+        <p className="gameover-subtitle">Alle Fragen gespielt – nächstes Board laden oder Spiel beenden</p>
+
+        <ol className="final-scores" style={{ marginBottom: 24 }}>
+          {sorted.map((p, i) => (
+            <li key={p.id} className={`final-score-item ${i === 0 ? 'winner' : ''}`}>
+              <span className="final-rank">{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}</span>
+              <span className="final-name">{p.name}</span>
+              <span className={`final-score-value ${p.score < 0 ? 'is-negative' : 'is-positive'}`}>
+                {p.score}<span className="final-score-unit">Pts</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+
+        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 24 }}>
+          <button className="btn-primary btn-lg" onClick={fetchLibraryForNextBoard} disabled={loadingLibrary}>
+            {loadingLibrary ? 'Lade…' : '📚 Board aus Bibliothek laden'}
+          </button>
+          <button className="btn-secondary btn-lg" onClick={endGameNow}>
+            🏆 Spiel beenden
+          </button>
+        </div>
+
+        {libraryQuizzes.length > 0 && (
+          <div className="board-complete-library">
+            <div className="sidebar-label" style={{ marginBottom: 10 }}>BIBLIOTHEK</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 320, overflowY: 'auto' }}>
+              {libraryQuizzes.map((q) => (
+                <button
+                  key={q.id}
+                  className="btn-secondary"
+                  onClick={() => loadNextBoardFromLibrary(q.id)}
+                  disabled={loadingBoard}
+                  style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 2 }}
+                >
+                  <span style={{ fontWeight: 600 }}>{q.name}</span>
+                  {q.description && <span style={{ fontSize: 12, opacity: 0.7 }}>{q.description}</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     );
   }

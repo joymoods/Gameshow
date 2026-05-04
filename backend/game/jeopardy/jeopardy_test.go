@@ -458,8 +458,8 @@ func TestCloseQuestion_AdvancesActivePlayer(t *testing.T) {
 	}
 
 	res := result.(map[string]any)
-	if res["gameOver"].(bool) {
-		t.Error("expected gameOver=false with questions remaining")
+	if res["boardComplete"].(bool) {
+		t.Error("expected boardComplete=false with questions remaining")
 	}
 
 	newActive := room.ActivePlayer()
@@ -495,13 +495,13 @@ func TestCloseQuestion_GameOver_AllQuestionsPlayed(t *testing.T) {
 		game.HandleAdminCommand("answer", map[string]any{"playerId": alice.ID, "correct": true})
 		res, _ := game.HandleAdminCommand("close_question", map[string]any{})
 		r := res.(map[string]any)
-		if qID != "q-3" && r["gameOver"].(bool) {
-			t.Errorf("expected gameOver=false before last question, got true at %s", qID)
+		if qID != "q-3" && r["boardComplete"].(bool) {
+			t.Errorf("expected boardComplete=false before last question, got true at %s", qID)
 		}
 	}
 
-	if currentPhase(game) != string(PhaseGameOver) {
-		t.Errorf("expected GAME_OVER after all questions played, got %q", currentPhase(game))
+	if currentPhase(game) != string(PhaseBoardComplete) {
+		t.Errorf("expected BOARD_COMPLETE after all questions played, got %q", currentPhase(game))
 	}
 }
 

@@ -319,6 +319,10 @@ func (h *Handler) BroadcastGameOver(scores any) {
 	})
 }
 
+func (h *Handler) BroadcastBoardComplete() {
+	h.hub.Broadcast(OutgoingMessage{Type: MsgBoardComplete, Payload: map[string]any{}})
+}
+
 func (h *Handler) BroadcastGameSwitched(gameType string) {
 	h.hub.Broadcast(OutgoingMessage{
 		Type:    MsgGameSwitched,

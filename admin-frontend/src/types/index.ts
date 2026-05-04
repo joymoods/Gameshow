@@ -37,6 +37,7 @@ export type GamePhase =
   | 'ACTIVE_PLAYER_ANSWERING'
   | 'BUZZER_PHASE'
   | 'QUESTION_DONE'
+  | 'BOARD_COMPLETE'
   | 'GAME_OVER';
 
 // ---- WebSocket message types ----
@@ -149,4 +150,5 @@ export const MSG = {
   MEDIA_PLAY: 'MEDIA_PLAY',
   MEDIA_PAUSE: 'MEDIA_PAUSE',
   MEDIA_SEEK: 'MEDIA_SEEK',
+  BOARD_COMPLETE: 'BOARD_COMPLETE',
 } as const;

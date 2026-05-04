@@ -811,6 +811,15 @@ input:focus, textarea:focus, select:focus { border-color: var(--primary); }
 .final-score-value.is-positive { color: var(--primary); }
 .final-score-value.is-negative { color: var(--danger); }
 .final-score-unit { font-size: 12px; font-weight: 400; color: var(--text-muted); margin-left: 3px; }
+.board-complete-library {
+  width: 100%;
+  max-width: 480px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  animation: fadeIn 0.3s ease;
+}
 
 /* ---- HomePage ---- */
 .home-page {
