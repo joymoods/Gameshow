@@ -59,12 +59,15 @@ export default function JeopardyGame() {
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
 
   // Player-controllable: volume only (play/pause/seek stays admin-only)
-  const [mediaVolume, setMediaVolume] = useState(1);
+  const [mediaVolume, setMediaVolume] = useState(() =>
+    parseFloat(localStorage.getItem('brainstorm_volume') ?? '1')
+  );
   const [mediaProgress, setMediaProgress] = useState(0);   // 0–1
   const [mediaDuration, setMediaDuration] = useState(0);
 
   function handleVolumeChange(val: number) {
     setMediaVolume(val);
+    localStorage.setItem('brainstorm_volume', String(val));
     if (videoRef.current) videoRef.current.volume = val;
     if (audioRef.current) audioRef.current.volume = val;
   }
@@ -262,7 +265,7 @@ export default function JeopardyGame() {
             className="game-board-grid"
             style={{
               gridTemplateColumns: `repeat(${board.length}, 1fr)`,
-              gridTemplateRows: `auto repeat(${numRows}, 1fr)`,
+              gridTemplateRows: `auto repeat(${numRows}, minmax(0, 1fr))`,
             }}
           >
             {board.map((c) => (

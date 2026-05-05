@@ -370,6 +370,7 @@ input { font-family: inherit; outline: none; transition: border-color 0.2s, box-
   flex-direction: column;
   gap: 8px;
   min-height: 0;
+  overflow: hidden;
   width: 100%;
   max-width: calc((100vh - 280px) * 16 / 9);
   margin: 0 auto;
@@ -439,11 +440,11 @@ input { font-family: inherit; outline: none; transition: border-color 0.2s, box-
 .player-strip {
   display: flex;
   gap: 8px;
-  padding: 8px 18px;
+  padding: 12px 18px;
   background: var(--bg);
   border-top: 1px solid var(--border);
   flex-shrink: 0;
-  height: 100px;
+  height: 280px;
   justify-content: center;
   align-items: center;
 }
@@ -452,35 +453,35 @@ input { font-family: inherit; outline: none; transition: border-color 0.2s, box-
   border: 2px solid var(--border);
   border-radius: 10px;
   background: var(--surface);
-  padding: 6px 10px 8px;
+  padding: 10px 12px 14px;
   text-align: center;
   transition: all 0.2s;
-  max-width: 120px;
+  max-width: 160px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 .player-strip-card.is-active { border-color: var(--success); box-shadow: 0 0 14px rgba(34,197,94,0.25); }
 .player-strip-card.is-me     { border-color: var(--primary); box-shadow: 0 0 10px rgba(79,110,247,0.2); }
-.player-strip-active-label { font-size: 9px; color: var(--success); font-weight: 700; letter-spacing: 1px; flex-shrink: 0; }
+.player-strip-active-label { font-size: 10px; color: var(--success); font-weight: 700; letter-spacing: 1px; flex-shrink: 0; }
 .player-strip-avatar {
-  width: 36px;
-  height: 36px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
   background: var(--surface2);
   color: var(--text-muted);
-  font-size: 18px;
+  font-size: 32px;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .player-strip-bottom { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; flex-shrink: 0; max-width: 100%; }
-.player-strip-name { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70px; }
+.player-strip-name { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 120px; }
 .player-strip-name.is-me { font-weight: 700; color: var(--text); }
 .player-strip-name.other { color: var(--text-muted); }
-.player-strip-score { font-size: 15px; font-weight: 800; display: inline-block; position: relative; }
+.player-strip-score { font-size: 22px; font-weight: 800; display: inline-block; position: relative; }
 .player-strip-score.positive { color: var(--gold); }
 .player-strip-score.negative { color: var(--danger); }
 .player-strip-delta {
@@ -502,7 +503,7 @@ input { font-family: inherit; outline: none; transition: border-color 0.2s, box-
   top: 0;
   left: 0;
   right: 0;
-  bottom: 100px;
+  bottom: 280px;
   background: rgba(5,7,14,0.96);
   display: flex;
   flex-direction: column;
