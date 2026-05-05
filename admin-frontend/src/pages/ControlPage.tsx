@@ -106,18 +106,38 @@ export default function ControlPage({ toast }: Props) {
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const suppressVolumeSave = useRef(false);
+  const savedVolume = () => parseFloat(localStorage.getItem('brainstorm_volume') ?? '1');
+
+  function handleAdminVolumeChange(el: HTMLVideoElement | HTMLAudioElement) {
+    if (!suppressVolumeSave.current) {
+      localStorage.setItem('brainstorm_volume', String(el.volume));
+    }
+  }
+
+  function applyVolume() {
+    const vol = savedVolume();
+    if (videoRef.current) videoRef.current.volume = vol;
+    if (audioRef.current) audioRef.current.volume = vol;
+  }
 
   // Reset media state when question changes
   useEffect(() => {
+    suppressVolumeSave.current = true;
     setMediaPlaying(false);
+    const vol = savedVolume();
     if (videoRef.current) {
       videoRef.current.pause();
       videoRef.current.currentTime = 0;
+      videoRef.current.volume = vol;
     }
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
+      audioRef.current.volume = vol;
     }
+    const t = setTimeout(() => { suppressVolumeSave.current = false; }, 500);
+    return () => clearTimeout(t);
   }, [currentQuestion?.questionId]);
 
   // Sync own media element when mediaPlaying changes
@@ -480,11 +500,15 @@ export default function ControlPage({ toast }: Props) {
 
               {currentQuestion.audioUrl && (
                 <audio ref={audioRef} src={currentQuestion.audioUrl} controls loop className="q-media" style={{ width: '100%' }}
-                  onSeeked={() => handleAdminSeeked(audioRef.current!)} />
+                  onCanPlay={applyVolume}
+                  onSeeked={() => handleAdminSeeked(audioRef.current!)}
+                  onVolumeChange={() => handleAdminVolumeChange(audioRef.current!)} />
               )}
               {currentQuestion.videoUrl && (
                 <video ref={videoRef} src={currentQuestion.videoUrl} controls loop className="q-media q-media--video"
-                  onSeeked={() => handleAdminSeeked(videoRef.current!)} />
+                  onCanPlay={applyVolume}
+                  onSeeked={() => handleAdminSeeked(videoRef.current!)}
+                  onVolumeChange={() => handleAdminVolumeChange(videoRef.current!)} />
               )}
 
               {/* Timer controls */}
