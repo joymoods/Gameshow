@@ -83,6 +83,8 @@ prompt_value() {
   fi
 }
 
+local_ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
+
 # ============================================================================
 header "BrainStorm Setup"
 echo -e "\n  Dieses Script richtet alle Umgebungsvariablen ein" >&2
@@ -109,9 +111,9 @@ gen_token="$(openssl rand -hex 32 2>/dev/null)"
 
 if [[ -n "$cur_token" ]]; then
   echo -e "  Aktuell: ${YELLOW}${cur_token:0:16}…${RESET}" >&2
-  ask "Übernehmen? [Enter] oder 'neu' für neuen Token:"
+  ask "Vorhandenen Token behalten? [J/n]:"
   read -r ans
-  if [[ "$ans" == "neu" ]]; then
+  if [[ "$ans" =~ ^[nN]$ ]]; then
     cur_token="$gen_token"
     ok "Neuer Token generiert"
   else
@@ -159,8 +161,8 @@ fi
 env_set .env ADMIN_PASSWORD_HASH "$cur_hash"
 
 # ============================================================================
-step "Admin-Frontend: VITE_API_URL"
-info "URL des Go-Backends. Leer lassen wenn Admin + Backend hinter Caddy laufen."
+step "Frontend-Konfiguration"
+info "Frontends laufen hinter Caddy – URLs werden automatisch gesetzt."
 # ============================================================================
 
 if [[ ! -f "admin-frontend/.env" ]]; then
@@ -169,29 +171,10 @@ if [[ ! -f "admin-frontend/.env" ]]; then
 else
   env_sanitize admin-frontend/.env
 fi
-
-cur_api_url="$(env_get admin-frontend/.env VITE_API_URL)"
-new_api_url="$(prompt_value "VITE_API_URL (Admin)" "$cur_api_url" "" 0)"
-env_set admin-frontend/.env VITE_API_URL "$new_api_url"
-ok "VITE_API_URL (Admin) gesetzt: '${new_api_url}'"
-
-# ============================================================================
-step "Admin-Frontend: VITE_PLAYER_URL"
-info "Öffentliche URL des Player-Frontends – erscheint im QR-Code der Lobby."
-# ============================================================================
-
-local_ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
-cur_player_url="$(env_get admin-frontend/.env VITE_PLAYER_URL)"
-new_player_url="$(prompt_value "VITE_PLAYER_URL" "$cur_player_url" "http://${local_ip}" 0)"
-env_set admin-frontend/.env VITE_PLAYER_URL "$new_player_url"
-ok "VITE_PLAYER_URL gesetzt: '${new_player_url}'"
-
+env_set admin-frontend/.env VITE_API_URL ""
+env_set admin-frontend/.env VITE_PLAYER_URL "http://${local_ip}"
+ok "VITE_PLAYER_URL gesetzt: http://${local_ip}"
 info "React-Login (VITE_ADMIN_PASSWORD_HASH) wird automatisch aus ADMIN_PASSWORD_HASH synchronisiert."
-
-# ============================================================================
-step "Player-Frontend: VITE_API_URL"
-info "Gleiche URL wie beim Admin. Leer lassen wenn hinter Caddy."
-# ============================================================================
 
 if [[ ! -f "player-frontend/.env" ]]; then
   cp player-frontend/.env.example player-frontend/.env
@@ -199,11 +182,7 @@ if [[ ! -f "player-frontend/.env" ]]; then
 else
   env_sanitize player-frontend/.env
 fi
-
-cur_p_api="$(env_get player-frontend/.env VITE_API_URL)"
-new_p_api="$(prompt_value "VITE_API_URL (Player)" "$cur_p_api" "$new_api_url" 0)"
-env_set player-frontend/.env VITE_API_URL "$new_p_api"
-ok "VITE_API_URL (Player) gesetzt: '${new_p_api}'"
+env_set player-frontend/.env VITE_API_URL ""
 
 # ============================================================================
 step "Zusammenfassung"
@@ -215,12 +194,12 @@ echo -e "    ADMIN_TOKEN          ${GREEN}$(env_get .env ADMIN_TOKEN | cut -c1-1
 echo -e "    ADMIN_PASSWORD_HASH  ${GREEN}$([ -n "$(env_get .env ADMIN_PASSWORD_HASH)" ] && echo 'gesetzt' || echo 'leer (kein Basic Auth)')${RESET}" >&2
 echo "" >&2
 echo -e "  ${BOLD}admin-frontend/.env:${RESET}" >&2
-echo -e "    VITE_API_URL         ${GREEN}$(env_get admin-frontend/.env VITE_API_URL | sed 's/^$/—/')${RESET}" >&2
-echo -e "    VITE_PLAYER_URL      ${GREEN}$(env_get admin-frontend/.env VITE_PLAYER_URL | sed 's/^$/—/')${RESET}" >&2
+echo -e "    VITE_API_URL         ${GREEN}— (Caddy)${RESET}" >&2
+echo -e "    VITE_PLAYER_URL      ${GREEN}$(env_get admin-frontend/.env VITE_PLAYER_URL)${RESET}" >&2
 echo -e "    VITE_ADMIN_PASSWORD_HASH  ${GREEN}(wird via make sync-env aus ADMIN_PASSWORD_HASH gesetzt)${RESET}" >&2
 echo "" >&2
 echo -e "  ${BOLD}player-frontend/.env:${RESET}" >&2
-echo -e "    VITE_API_URL         ${GREEN}$(env_get player-frontend/.env VITE_API_URL | sed 's/^$/—/')${RESET}" >&2
+echo -e "    VITE_API_URL         ${GREEN}— (Caddy)${RESET}" >&2
 
 echo "" >&2
 ask "Jetzt make deploy ausführen? [Enter = ja / Strg+C = abbrechen]"
