@@ -243,6 +243,10 @@ func (ro *Router) handleUploadQuiz(w http.ResponseWriter, r *http.Request, room 
 		writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
 		return
 	}
+	if err := validateBoardLimits(categories); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 	if _, err := room.Game.HandleAdminCommand("load_quiz", map[string]any{"categories": categories}); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return

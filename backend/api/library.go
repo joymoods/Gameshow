@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -43,6 +44,10 @@ func (ro *Router) handleLibraryCollection(w http.ResponseWriter, r *http.Request
 		}
 		if body.GameType == "" {
 			body.GameType = "jeopardy"
+		}
+		if err := validateBoardLimits(body.Categories); err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
 		}
 		summary, err := ro.quizStore.Create(r.Context(), body.Name, body.Description, body.GameType, body.Categories)
 		if err != nil {
@@ -112,6 +117,10 @@ func (ro *Router) handleLibraryRoutes(w http.ResponseWriter, r *http.Request) {
 		}
 		if body.Name == "" {
 			writeError(w, http.StatusBadRequest, "name is required")
+			return
+		}
+		if err := validateBoardLimits(body.Categories); err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
 		summary, err := ro.quizStore.Update(r.Context(), id, body.Name, body.Description, body.Categories)
@@ -202,6 +211,21 @@ func (ro *Router) handleLoadFromLibrary(w http.ResponseWriter, r *http.Request, 
 	ro.wsHandler.BroadcastGameState(room)
 	snap := room.Snapshot()
 	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "categories": snap.Categories})
+}
+
+const maxCategories = 6
+const maxQuestionsPerCategory = 5
+
+func validateBoardLimits(categories []core.Category) error {
+	if len(categories) > maxCategories {
+		return fmt.Errorf("too many categories: max %d allowed", maxCategories)
+	}
+	for _, c := range categories {
+		if len(c.Questions) > maxQuestionsPerCategory {
+			return fmt.Errorf("category %q has too many questions: max %d allowed", c.Name, maxQuestionsPerCategory)
+		}
+	}
+	return nil
 }
 
 func libraryToCore(detail *library.QuizDetail) []core.Category {

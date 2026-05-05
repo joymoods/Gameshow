@@ -9,6 +9,9 @@ import type { ToastType } from '../../../App';
 import BoardPreview from '../../../components/BoardPreview';
 import { API, apiFetch } from '../../../api/client';
 
+const MAX_CATEGORIES = 6;
+const MAX_QUESTIONS_PER_CATEGORY = 5;
+
 function emptyQuestion(categoryId: string): Question {
   return { id: uuidv4(), categoryId, points: 200, text: '', answer: '', played: false };
 }
@@ -147,6 +150,10 @@ export default function BuilderPage({ toast }: Props) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function addCategory() {
+    if (builderCategories.length >= MAX_CATEGORIES) {
+      toast(`Maximal ${MAX_CATEGORIES} Kategorien erlaubt`, 'error');
+      return;
+    }
     setBuilderCategories([...builderCategories, emptyCategory()]);
   }
 
@@ -160,6 +167,11 @@ export default function BuilderPage({ toast }: Props) {
   }
 
   function addQuestion(catId: string) {
+    const cat = builderCategories.find((c) => c.id === catId);
+    if (cat && cat.questions.length >= MAX_QUESTIONS_PER_CATEGORY) {
+      toast(`Maximal ${MAX_QUESTIONS_PER_CATEGORY} Fragen pro Kategorie erlaubt`, 'error');
+      return;
+    }
     setBuilderCategories(
       builderCategories.map((c) =>
         c.id === catId ? { ...c, questions: [...c.questions, emptyQuestion(catId)] } : c
@@ -224,12 +236,18 @@ export default function BuilderPage({ toast }: Props) {
       try {
         const cats = JSON.parse(reader.result as string) as Category[];
         if (!Array.isArray(cats)) throw new Error('not an array');
-        const reset = cats.map((c) => ({
+        const wasClipped =
+          cats.length > MAX_CATEGORIES ||
+          cats.some((c) => c.questions.length > MAX_QUESTIONS_PER_CATEGORY);
+        const truncated = cats.slice(0, MAX_CATEGORIES).map((c) => ({
           ...c,
-          questions: c.questions.map((q) => ({ ...q, played: false })),
+          questions: c.questions.slice(0, MAX_QUESTIONS_PER_CATEGORY).map((q) => ({ ...q, played: false })),
         }));
-        setBuilderCategories(reset);
-        toast('Quiz importiert', 'success');
+        setBuilderCategories(truncated);
+        toast(
+          wasClipped ? 'Quiz importiert (auf Limits gekürzt)' : 'Quiz importiert',
+          wasClipped ? 'info' : 'success',
+        );
       } catch {
         toast('Ungültige JSON-Datei', 'error');
       }
@@ -317,7 +335,13 @@ export default function BuilderPage({ toast }: Props) {
             <button className="btn-secondary btn-sm" onClick={() => navigate('/library')}>
               ← Bibliothek
             </button>
-            <button className="btn-secondary btn-sm" onClick={addCategory}>+ Kategorie</button>
+            <button
+              className="btn-secondary btn-sm"
+              onClick={addCategory}
+              disabled={builderCategories.length >= MAX_CATEGORIES}
+            >
+              + Kategorie ({builderCategories.length}/{MAX_CATEGORIES})
+            </button>
             {editingQuizId ? (
               <button
                 className="btn-primary"
@@ -421,8 +445,12 @@ export default function BuilderPage({ toast }: Props) {
                   ))}
                 </div>
 
-                <button className="add-question-btn" onClick={() => addQuestion(cat.id)}>
-                  + Frage hinzufügen
+                <button
+                  className="add-question-btn"
+                  onClick={() => addQuestion(cat.id)}
+                  disabled={cat.questions.length >= MAX_QUESTIONS_PER_CATEGORY}
+                >
+                  + Frage hinzufügen ({cat.questions.length}/{MAX_QUESTIONS_PER_CATEGORY})
                 </button>
               </div>
             ))}
