@@ -5,6 +5,7 @@ import { useGameStore } from '../store/gameStore';
 import { getGameLogo } from '../utils/gameLogos';
 
 const API = import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}`;
+const MAX_NAME_LEN = 15;
 
 export default function JoinPage() {
   const navigate = useNavigate();
@@ -115,11 +116,12 @@ export default function JoinPage() {
               ref={nameRef}
               className="join-name-input"
               value={name}
-              onChange={(e) => setName(e.target.value.slice(0, 20))}
+              onChange={(e) => setName(e.target.value.slice(0, MAX_NAME_LEN))}
               onKeyDown={(e) => e.key === 'Enter' && submit()}
               placeholder="Wie soll dich das Spiel nennen?"
               style={{ border: nameBorder, boxShadow: nameBoxShadow }}
             />
+            <div className="join-char-counter">{name.length}/{MAX_NAME_LEN}</div>
           </div>
 
           {err && <div className="join-error">{err}</div>}

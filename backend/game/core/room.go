@@ -72,7 +72,7 @@ func (r *Room) SetPhase(phase RoomPhase) {
 var ErrNameTaken = errors.New("name already taken")
 var ErrNameTooLong = errors.New("name too long")
 
-const maxPlayerNameLen = 50
+const maxPlayerNameLen = 15
 
 func (r *Room) AddPlayer(name string) (*Player, bool, error) {
 	if len(name) > maxPlayerNameLen {

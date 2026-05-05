@@ -20,7 +20,7 @@ interface ScoreDelta {
 export default function JeopardyGame() {
   const {
     phase, board, players, playerOrder,
-    myPlayerId, myPlayerName,
+    myPlayerId,
     activePlayerId, activePlayerName,
     currentQuestion,
     buzzerOpen, hasBuzzed,
@@ -293,11 +293,11 @@ export default function JeopardyGame() {
             const cardClass = isMe ? 'is-me' : isActive ? 'is-active' : '';
             return (
               <div key={p.id} className={`player-strip-card ${cardClass}`}>
-                {isActive && <div className="player-strip-active-label">● DRAN</div>}
                 <div className="player-strip-avatar">
                   {p.name[0]?.toUpperCase() ?? '?'}
                 </div>
-                <div className="player-strip-bottom">
+                <div className="player-strip-info">
+                  {isActive && <div className="player-strip-active-label">● DRAN</div>}
                   <div className={`player-strip-name ${isMe ? 'is-me' : 'other'}`}>{p.name}</div>
                   <div style={{ position: 'relative', display: 'inline-block' }}>
                     <div className={`player-strip-score ${p.score < 0 ? 'negative' : 'positive'}`}>{p.score}</div>
@@ -472,8 +472,6 @@ export default function JeopardyGame() {
         </div>
       )}
 
-      {/* Name display */}
-      <div className="player-name-badge">{myPlayerName}</div>
     </div>
   );
 }
