@@ -23,6 +23,8 @@ Weitere Docs: [`docs/PROJECT_OVERVIEW.md`](docs/PROJECT_OVERVIEW.md) · [`docs/T
 
 ## Quick Start (Deployment)
 
+Voraussetzung: **make** muss installiert sein (`sudo apt install make` / `brew install make`).
+
 ```bash
 git clone https://github.com/joymoods/Jeopardy.git brainstorm
 cd brainstorm
