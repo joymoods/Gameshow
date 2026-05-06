@@ -11,6 +11,17 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// Storer is the interface the API layer uses for library operations.
+// Using an interface keeps the API package free of pgxpool and allows
+// an in-memory stub in tests.
+type Storer interface {
+	List(ctx context.Context) ([]QuizSummary, error)
+	Get(ctx context.Context, id string) (*QuizDetail, error)
+	Create(ctx context.Context, name, description, gameType string, categories []core.Category) (*QuizSummary, error)
+	Update(ctx context.Context, id, name, description string, categories []core.Category) (*QuizSummary, error)
+	Delete(ctx context.Context, id string) error
+}
+
 type QuizStore struct {
 	pool *pgxpool.Pool
 }

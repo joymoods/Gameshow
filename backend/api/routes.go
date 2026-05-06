@@ -14,10 +14,10 @@ import (
 type Router struct {
 	manager   *core.Manager
 	wsHandler *ws.Handler
-	quizStore *library.QuizStore
+	quizStore library.Storer
 }
 
-func NewRouter(manager *core.Manager, wsHandler *ws.Handler, quizStore *library.QuizStore) *Router {
+func NewRouter(manager *core.Manager, wsHandler *ws.Handler, quizStore library.Storer) *Router {
 	return &Router{manager: manager, wsHandler: wsHandler, quizStore: quizStore}
 }
 

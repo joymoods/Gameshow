@@ -101,10 +101,13 @@
 
 ## Offen
 
+- [x] Testplan aktualisieren: Auth-Flow, Library, Timer, WebRTC-Abschnitte ergänzen
+
+## v2.0 / Backlog
+
 - [ ] Zweiter Spieltyp (z.B. Multiple-Choice) als Proof-of-Concept für das Game-Interface
 - [ ] Persist-Option für Room-State (aktuell In-Memory; geht verloren bei Neustart)
 - [ ] Automatischer Timer-Ablauf: optionale Aktion wenn Timer auf 0 läuft
-- [ ] Testplan aktualisieren: Auth-Flow, Library, Timer, WebRTC-Abschnitte ergänzen
 
 ---
 

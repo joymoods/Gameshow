@@ -1,8 +1,30 @@
-# BrainStorm – Manueller Testplan
+# BrainStorm – Testplan
 
-**Version:** 1.0  
-**Stand:** 2026-04-27  
+**Version:** 2.0  
+**Stand:** 2026-05-06  
 **Produkt:** BrainStorm Multiplayer-Quiz (Jeopardy)
+
+---
+
+## Automatisierte Tests
+
+Die meisten Backend-Szenarien sind durch Go-Unit-Tests abgedeckt und laufen vollautomatisch:
+
+```bash
+make test          # Go-Tests mit Race-Detektor
+make test-api      # Postman-Collection via Newman (npm i -g newman nötig)
+```
+
+**Was die automatisierten Tests abdecken:**
+
+| Paket | Scope |
+|-------|-------|
+| `games/api` | Alle REST-Endpunkte inkl. Auth, CORS, Fehlerszenarien, Library, Media |
+| `games/game/core` | Room, Player-Management, Scoring, Phasen |
+| `games/game/jeopardy` | Spiellogik, Buzzer, Timer, Board-Validierung |
+| `games/media` | Upload-Handler (gültige/ungültige Typen, Persistenz) |
+
+**Was manuell getestet werden muss:** Frontend-UX, WebSocket-Verhalten im Browser, QR-Code, Drag & Drop, Sound-Effekte, Multi-Device-Szenarien.
 
 ---
 
@@ -10,19 +32,21 @@
 
 1. [Voraussetzungen](#1-voraussetzungen)
 2. [Smoke Tests – Infrastruktur](#2-smoke-tests--infrastruktur)
-3. [REST API – Room-Management](#3-rest-api--room-management)
-4. [REST API – Quiz & Media](#4-rest-api--quiz--media)
-5. [Admin-Frontend – HomePage](#5-admin-frontend--homepage)
-6. [Admin-Frontend – LobbyPage](#6-admin-frontend--lobbypage)
-7. [Admin-Frontend – Quiz-Builder](#7-admin-frontend--quiz-builder)
-8. [Admin-Frontend – ControlPage](#8-admin-frontend--controlpage)
-9. [Player-Frontend – JoinPage](#9-player-frontend--joinpage)
-10. [Player-Frontend – WaitingPage](#10-player-frontend--waitingpage)
-11. [Player-Frontend – JeopardyGame](#11-player-frontend--jeopardygame)
-12. [Player-Frontend – EndPage](#12-player-frontend--endpage)
-13. [Vollständiger Spielablauf (Integration)](#13-vollständiger-spielablauf-integration)
-14. [Edge Cases & Fehlerszenarien](#14-edge-cases--fehlerszenarien)
-15. [Checkliste](#15-checkliste)
+3. [Auth-Flow](#3-auth-flow)
+4. [REST API – Room-Management](#4-rest-api--room-management)
+5. [REST API – Quiz, Library & Media](#5-rest-api--quiz-library--media)
+6. [Admin-Frontend – Login & HomePage](#6-admin-frontend--login--homepage)
+7. [Admin-Frontend – LobbyPage](#7-admin-frontend--lobbypage)
+8. [Admin-Frontend – Quiz-Builder](#8-admin-frontend--quiz-builder)
+9. [Admin-Frontend – ControlPage](#9-admin-frontend--controlpage)
+10. [Player-Frontend – JoinPage](#10-player-frontend--joinpage)
+11. [Player-Frontend – WaitingPage](#11-player-frontend--waitingpage)
+12. [Player-Frontend – JeopardyGame](#12-player-frontend--jeopardygame)
+13. [Player-Frontend – EndPage](#13-player-frontend--endpage)
+14. [Vollständiger Spielablauf (Integration)](#14-vollständiger-spielablauf-integration)
+15. [Multi-Board-Flow](#15-multi-board-flow)
+16. [Edge Cases & Fehlerszenarien](#16-edge-cases--fehlerszenarien)
+17. [Checkliste](#17-checkliste)
 
 ---
 
@@ -31,14 +55,10 @@
 ### Setup
 
 ```bash
-# Docker Stack starten (im Projekt-Root)
 docker compose up -d
-
-# Status prüfen
-docker compose ps
+docker compose ps   # alle Container: running
+make test           # Go-Unit-Tests lokal ausführen
 ```
-
-Alle drei Container müssen `running` sein: `backend`, `caddy`.
 
 ### URLs (lokal)
 
@@ -49,19 +69,13 @@ Alle drei Container müssen `running` sein: `backend`, `caddy`.
 | Backend API | `http://192.168.178.130/api` |
 | WebSocket | `ws://192.168.178.130/ws` |
 
-> **Tipp:** Für Player-Tests auf dem gleichen Rechner: zweites Browserfenster oder Inkognito-Tab nutzen. Für QR-Code-Tests: Smartphone im selben WLAN.
-
 ### Benötigte Tools
 
-- Browser (Chrome oder Firefox, aktuell)
+- Browser (Chrome oder Firefox)
 - `curl` im Terminal
-- Optional: Smartphone für QR-Code-Scan
-- Optional: [websocat](https://github.com/vi/websocat) für WebSocket-Tests
+- `ADMIN_TOKEN` aus der Root-`.env` bekannt
 
-
-### Beispiel-Quiz (JSON)
-
-Dieses Quiz wird in mehreren Tests benötigt – einmal als Datei für `curl`-Befehle und einmal zum Importieren im Browser. Erstelle die Datei **einmalig zu Beginn** mit diesem Befehl im Terminal:
+### Beispiel-Quiz
 
 ```bash
 cat > /tmp/quiz.json << 'EOF'
@@ -70,994 +84,699 @@ cat > /tmp/quiz.json << 'EOF'
     "id": "cat-1",
     "name": "Geographie",
     "questions": [
-      {
-        "id": "q-1",
-        "points": 100,
-        "text": "Hauptstadt von Deutschland?",
-        "answer": "Berlin",
-        "imageUrl": "",
-        "audioUrl": "",
-        "videoUrl": ""
-      },
-      {
-        "id": "q-2",
-        "points": 200,
-        "text": "Längster Fluss der Welt?",
-        "answer": "Nil",
-        "imageUrl": "",
-        "audioUrl": "",
-        "videoUrl": ""
-      }
+      {"id": "q-1", "points": 100, "text": "Hauptstadt von Deutschland?", "answer": "Berlin", "imageUrl": "", "audioUrl": "", "videoUrl": ""},
+      {"id": "q-2", "points": 200, "text": "Längster Fluss der Welt?", "answer": "Nil", "imageUrl": "", "audioUrl": "", "videoUrl": ""}
     ]
   },
   {
     "id": "cat-2",
     "name": "Wissenschaft",
     "questions": [
-      {
-        "id": "q-3",
-        "points": 100,
-        "text": "Chemisches Symbol für Wasser?",
-        "answer": "H2O",
-        "imageUrl": "",
-        "audioUrl": "",
-        "videoUrl": ""
-      },
-      {
-        "id": "q-4",
-        "points": 200,
-        "text": "Wie viele Planeten hat unser Sonnensystem?",
-        "answer": "8",
-        "imageUrl": "",
-        "audioUrl": "",
-        "videoUrl": ""
-      }
+      {"id": "q-3", "points": 100, "text": "Chemisches Symbol für Wasser?", "answer": "H2O", "imageUrl": "", "audioUrl": "", "videoUrl": ""},
+      {"id": "q-4", "points": 200, "text": "Wie viele Planeten hat unser Sonnensystem?", "answer": "8", "imageUrl": "", "audioUrl": "", "videoUrl": ""}
     ]
   }
 ]
 EOF
 ```
 
-Prüfen ob die Datei korrekt erstellt wurde:
-
-```bash
-cat /tmp/quiz.json | jq .[].name
-# Ausgabe: "Geographie" und "Wissenschaft"
-```
-
-> Diese Datei wird in Tests 4.1 (curl-Upload), 7.7 (Browser-Import) und 13 (Integration) verwendet. Downloade sie auch auf deinen lokalen Rechner, falls du sie im Browser-Datei-Dialog auswählen musst (der Browser sieht `/tmp/` auf dem Server nicht direkt).
-
 ---
 
 ## 2. Smoke Tests – Infrastruktur
 
-**Ziel:** Prüfen ob alle Dienste erreichbar sind.
+> **Automatisiert:** `make test` deckt Backend-Seite ab. Nur die Browser-Checks sind manuell.
 
 ### 2.1 Backend API erreichbar
 
 ```bash
-curl -s http://192.168.178.130/api/rooms
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" http://192.168.178.130/api/rooms
 ```
+**Erwartet:** HTTP 200, JSON-Array
 
-**Erwartetes Ergebnis:** HTTP 200, JSON-Array (leer `[]` oder mit Rooms)
-
-### 2.2 Admin-Frontend lädt
-
-1. Browser öffnen → `http://192.168.178.130/admin`
-2. Seite lädt ohne Fehler
-3. Titel "BrainStorm" oder Rooms-Übersicht sichtbar
-
-**Erwartetes Ergebnis:** Keine 404, kein weißer Bildschirm, kein Console-Error
-
-### 2.3 Player-Frontend lädt
-
-1. Browser → `http://192.168.178.130/`
-2. Join-Formular (Room-Code + Name) sichtbar
-
-**Erwartetes Ergebnis:** Eingabefelder für Code und Name vorhanden
-
-### 2.4 WebSocket-Verbindung
+### 2.2 Auth-Schutz greift
 
 ```bash
-# Mit websocat (falls installiert)
+curl -s -o /dev/null -w "%{http_code}" http://192.168.178.130/api/rooms
+```
+**Erwartet:** `401`
+
+### 2.3 Admin-Frontend lädt
+
+Browser → `http://192.168.178.130/admin`  
+**Erwartet:** Login-Seite erscheint (kein 404, kein weißer Screen)
+
+### 2.4 Player-Frontend lädt
+
+Browser → `http://192.168.178.130/`  
+**Erwartet:** Join-Formular sichtbar
+
+### 2.5 WebSocket erreichbar
+
+```bash
+# mit websocat (optional)
 websocat ws://192.168.178.130/ws
 ```
-
-**Erwartetes Ergebnis:** Verbindung aufgebaut, keine Fehlermeldung
+**Erwartet:** Verbindung aufgebaut
 
 ---
 
-## 3. REST API – Room-Management
+## 3. Auth-Flow
 
-**Ziel:** Alle CRUD-Operationen für Rooms testen.
+> **Automatisiert:** Go-Tests in `games/api` prüfen 401/200 für alle geschützten Endpunkte.
 
-### 3.1 Room erstellen
+### 3.1 Admin-Login im Browser
+
+1. `http://192.168.178.130/admin` → Redirect zur `/login`-Seite
+2. `ADMIN_TOKEN` eingeben, bestätigen
+3. Token wird in `localStorage` gespeichert
+
+**Erwartet:** Redirect zur Rooms-Übersicht; kein erneutes Login bei Seitenreload
+
+### 3.2 Login persistiert
+
+1. Nach Login Tab neu laden
+2. Seite lädt direkt ohne Login-Prompt
+
+**Erwartet:** Kein erneutes Login erforderlich
+
+### 3.3 Falschem Token → Fehlermeldung
+
+1. Auf `/admin/login` navigieren, falsches Token eingeben
+2. Bestätigen
+
+**Erwartet:** Fehlermeldung "Ungültig" oder ähnlich; kein Zugang
+
+### 3.4 API ohne Token → 401
+
+```bash
+curl -s -o /dev/null -w "%{http_code}" \
+  -X POST http://192.168.178.130/api/rooms \
+  -H "Content-Type: application/json" \
+  -d '{"game_type":"jeopardy"}'
+```
+**Erwartet:** `401`
+
+### 3.5 Library Write ohne Token → 401
+
+```bash
+curl -s -o /dev/null -w "%{http_code}" \
+  -X POST http://192.168.178.130/api/library \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Test","game_type":"jeopardy","categories":[]}'
+```
+**Erwartet:** `401`
+
+### 3.6 Öffentlicher Room-Info-Endpunkt (kein Token)
+
+```bash
+export CODE=<room-code>
+curl -s http://192.168.178.130/api/room-info/$CODE | jq .
+```
+**Erwartet:** HTTP 200, `game_type` und `room_phase` — kein Auth-Header nötig
+
+---
+
+## 4. REST API – Room-Management
+
+> **Automatisiert:** Go-Tests in `games/api`.
+
+### 4.1 Room erstellen
 
 ```bash
 curl -s -X POST http://192.168.178.130/api/rooms \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"game_type": "jeopardy"}' | jq .
+export CODE=<code aus Antwort>
 ```
+**Erwartet:** HTTP 201, 6-stelliger Code, `room_phase: "LOBBY"`, `game_type: "jeopardy"`
 
-**Erwartetes Ergebnis:**
-- HTTP 201
-- Response enthält `code` (6-stellig, Großbuchstaben/Zahlen)
-- `room_phase: "LOBBY"`
-- `game_type: "jeopardy"`
-
-> **Merke dir den Code** für die folgenden Tests — z.B. `EXPORT CODE=ABCXYZ`
+### 4.2 Alle Rooms abrufen
 
 ```bash
-export CODE=<deinen-code-hier>
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+  http://192.168.178.130/api/rooms | jq .
 ```
+**Erwartet:** HTTP 200, Array mit dem erstellten Room
 
-### 3.2 Alle Rooms abrufen
+### 4.3 Einzelnen Room abrufen
 
 ```bash
-curl -s http://192.168.178.130/api/rooms | jq .
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+  http://192.168.178.130/api/rooms/$CODE | jq .
 ```
+**Erwartet:** HTTP 200, `room_phase: "LOBBY"`, `players: []`
 
-**Erwartetes Ergebnis:**
-- HTTP 200
-- Array enthält den gerade erstellten Room mit dem richtigen Code
-
-### 3.3 Einzelnen Room abrufen
+### 4.4 Room löschen
 
 ```bash
-curl -s http://192.168.178.130/api/rooms/$CODE | jq .
-```
-
-**Erwartetes Ergebnis:**
-- HTTP 200
-- Room-Details: `code`, `room_phase: "LOBBY"`, `players: []`
-
-### 3.4 Room löschen
-
-```bash
-# Neuen Room zum Löschen erstellen
 TEMP=$(curl -s -X POST http://192.168.178.130/api/rooms \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"game_type": "jeopardy"}' | jq -r .code)
+  -d '{"game_type":"jeopardy"}' | jq -r .code)
 
-# Löschen
-curl -s -X DELETE http://192.168.178.130/api/rooms/$TEMP
+curl -s -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" \
+  http://192.168.178.130/api/rooms/$TEMP
 
-# Prüfen ob weg
-curl -s http://192.168.178.130/api/rooms/$TEMP
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+  http://192.168.178.130/api/rooms/$TEMP
 ```
+**Erwartet:** DELETE → 200; GET danach → 404
 
-**Erwartetes Ergebnis:**
-- DELETE: HTTP 200 oder 204
-- GET danach: HTTP 404
-
-### 3.5 Spieler-Reihenfolge setzen (API)
+### 4.5 Spieler-Reihenfolge
 
 ```bash
-# Setzt Player-Order – Body ist ein JSON-Array mit Spieler-IDs (leer = keine Änderung)
 curl -s -X POST http://192.168.178.130/api/rooms/$CODE/players/order \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '[]'
+
+curl -s -X POST http://192.168.178.130/api/rooms/$CODE/players/shuffle \
+  -H "Authorization: Bearer $ADMIN_TOKEN"
 ```
+**Erwartet:** jeweils HTTP 200
 
-**Erwartetes Ergebnis:** HTTP 200
-
-### 3.6 Spieler-Reihenfolge shufflen (API)
+### 4.6 Spieler kicken
 
 ```bash
-curl -s -X POST http://192.168.178.130/api/rooms/$CODE/players/shuffle
-```
+# Zuerst Room-Snapshot holen, Player-ID aus scores[0].id nehmen:
+PLAYER_ID=$(curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+  http://192.168.178.130/api/rooms/$CODE | jq -r '.scores[0].id')
 
-**Erwartetes Ergebnis:** HTTP 200
+curl -s -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" \
+  http://192.168.178.130/api/rooms/$CODE/players/$PLAYER_ID
+```
+**Erwartet:** HTTP 200; Spieler erscheint nicht mehr in der Lobby
 
 ---
 
-## 4. REST API – Quiz & Media
+## 5. REST API – Quiz, Library & Media
 
-**Ziel:** Quiz hochladen, exportieren und Media-Upload testen.
+> **Automatisiert:** Go-Tests in `games/api` und `games/media`.
 
-### 4.1 Quiz hochladen
-
-**Vorbereitung:** `$CODE` muss gesetzt sein (aus Test 3.1). `/tmp/quiz.json` muss existieren (aus Sektion 1).
+### 5.1 Quiz hochladen
 
 ```bash
-# Sicherstellen dass CODE gesetzt ist
-echo "Lade Quiz in Room: $CODE"
-
 curl -s -X POST http://192.168.178.130/api/rooms/$CODE/quiz \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d @/tmp/quiz.json | jq .
 ```
+**Erwartet:** HTTP 200, Board mit 2 Kategorien
 
-Der `@`-Prefix bei `-d @/tmp/quiz.json` bedeutet: Dateiinhalt als Request-Body senden (nicht den String `@/tmp/quiz.json`).
-
-**Erwartetes Ergebnis:** HTTP 200, Response enthält das Board mit 2 Kategorien und je 2 Fragen:
-
-```json
-{
-  "categories": [
-    { "name": "Geographie", "questions": [...] },
-    { "name": "Wissenschaft", "questions": [...] }
-  ]
-}
-```
-
-### 4.2 Quiz exportieren
+### 5.2 Quiz exportieren
 
 ```bash
-curl -s http://192.168.178.130/api/rooms/$CODE/export | jq .
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+  http://192.168.178.130/api/rooms/$CODE/export | jq .
 ```
+**Erwartet:** HTTP 200, Kategorien + Antworten enthalten
 
-**Erwartetes Ergebnis:**
-- HTTP 200
-- JSON mit denselben Kategorien und Fragen wie hochgeladen
-- `answer`-Felder enthalten die korrekten Antworten
-
-### 4.3 Media-Upload – Bild
+### 5.3 Board-Limits
 
 ```bash
-# Testbild erstellen (1x1 pixel PNG)
+# >6 Kategorien → 400:
+python3 -c "import json; print(json.dumps([{'id':f'c{i}','name':f'Cat{i}','questions':[]} for i in range(7)]))" \
+  | curl -s -X POST http://192.168.178.130/api/rooms/$CODE/quiz \
+    -H "Authorization: Bearer $ADMIN_TOKEN" \
+    -H "Content-Type: application/json" -d @-
+```
+**Erwartet:** HTTP 400, Fehlermeldung "too many categories"
+
+### 5.4 Library – Quiz anlegen
+
+```bash
+curl -s -X POST http://192.168.178.130/api/library \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Mein Quiz","game_type":"jeopardy","categories":[]}' | jq .
+export QUIZ_ID=<id aus Antwort>
+```
+**Erwartet:** HTTP 201, `id` vorhanden
+
+### 5.5 Library – Quiz laden
+
+```bash
+curl -s http://192.168.178.130/api/library | jq .          # Liste (kein Auth)
+curl -s http://192.168.178.130/api/library/$QUIZ_ID | jq . # Detail (kein Auth)
+```
+**Erwartet:** HTTP 200
+
+### 5.6 Library – Quiz in Room laden
+
+```bash
+curl -s -X POST http://192.168.178.130/api/rooms/$CODE/quiz/library/$QUIZ_ID \
+  -H "Authorization: Bearer $ADMIN_TOKEN" | jq .
+```
+**Erwartet:** HTTP 200, Room-Board aus Library-Quiz gesetzt
+
+### 5.7 Library – Quiz löschen
+
+```bash
+curl -s -X DELETE http://192.168.178.130/api/library/$QUIZ_ID \
+  -H "Authorization: Bearer $ADMIN_TOKEN"
+curl -s http://192.168.178.130/api/library/$QUIZ_ID
+```
+**Erwartet:** DELETE → 200; GET danach → 404
+
+### 5.8 Media-Upload – Bild
+
+```bash
 printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82' > /tmp/test.png
 
 curl -s -X POST http://192.168.178.130/api/media/upload \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
   -F "file=@/tmp/test.png" | jq .
 ```
+**Erwartet:** HTTP 200, `url` → `/media/<uuid>.png`
 
-**Erwartetes Ergebnis:**
-- HTTP 200
-- Response enthält `url` → `/media/<uuid>.png`
-
-### 4.4 Media-Datei abrufen
+### 5.9 Media-Upload – Ungültiger Typ
 
 ```bash
-# URL aus vorherigem Test verwenden
-MEDIA_URL=$(curl -s -X POST http://192.168.178.130/api/media/upload \
-  -F "file=@/tmp/test.png" | jq -r .url)
-
-curl -I http://192.168.178.130$MEDIA_URL
-```
-
-**Erwartetes Ergebnis:** HTTP 200, `Content-Type: image/png`
-
-### 4.5 Media-Upload – Ungültiger Typ (Fehlerfall)
-
-```bash
-echo "das ist kein bild" > /tmp/test.txt
+echo "kein bild" > /tmp/test.txt
 curl -s -X POST http://192.168.178.130/api/media/upload \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
   -F "file=@/tmp/test.txt"
 ```
+**Erwartet:** HTTP 400
 
-**Erwartetes Ergebnis:** HTTP 400 oder 415, Fehlermeldung
+### 5.10 Timer-Endpunkt
+
+```bash
+# Timer starten (30 Sek.):
+curl -s -X POST http://192.168.178.130/api/rooms/$CODE/question/timer \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"seconds":30}' | jq .
+
+# Timer stoppen:
+curl -s -X POST http://192.168.178.130/api/rooms/$CODE/question/timer \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"seconds":0}' | jq .
+```
+**Erwartet:** Start → `endsAt` + `durationMs`; Stop → `status: "stopped"`
 
 ---
 
-## 5. Admin-Frontend – HomePage
+## 6. Admin-Frontend – Login & HomePage
 
-**Ziel:** Room-Verwaltung im Browser testen.
-
-### 5.1 Rooms-Übersicht
+### 6.1 Login-Seite
 
 1. `http://192.168.178.130/admin` öffnen
-2. Liste der aktiven Rooms ist sichtbar
-3. Rooms werden alle 5 Sekunden aktualisiert (Polling läuft im Hintergrund)
+2. Redirect zur `/login`-Route
+3. Token eingeben, bestätigen
 
-**Erwartetes Ergebnis:** Room aus Test 3.1 erscheint in der Liste mit Phase "LOBBY"
+**Erwartet:** Redirect zur Rooms-Übersicht
 
-### 5.2 Neuen Room erstellen
+### 6.2 Rooms-Übersicht
 
-1. "Neuen Room erstellen"-Button klicken
-2. Room erscheint sofort in der Liste
-3. 6-stelliger Code ist sichtbar
+1. Rooms-Liste sichtbar (Polling alle 5s)
+2. Room aus 4.1 erscheint mit Phase "LOBBY"
 
-**Erwartetes Ergebnis:** Neuer Eintrag mit zufälligem Code
+### 6.3 Room erstellen (Browser)
 
-### 5.3 Room öffnen (LOBBY)
+1. "Neuen Room erstellen"-Button → Room erscheint sofort
 
-1. Auf einen LOBBY-Room klicken
-2. Navigation zur LobbyPage (`/rooms/:code/lobby`)
+### 6.4 Room öffnen
 
-**Erwartetes Ergebnis:** LobbyPage wird geladen
+| Phase | Erwartetes Ziel |
+|-------|----------------|
+| LOBBY | LobbyPage |
+| IN_PROGRESS | ControlPage |
 
-### 5.4 Room öffnen (IN_PROGRESS)
+### 6.5 Room löschen
 
-1. Einen laufenden Room (Phase `IN_PROGRESS`) anklicken
-2. Navigation direkt zur ControlPage (`/rooms/:code/control`)
-
-**Erwartetes Ergebnis:** ControlPage wird geladen (erst nach vollständigem Spielstart testbar)
-
-### 5.5 Room löschen
-
-1. Auf Löschen-Button/Icon beim Room klicken
-2. Bestätigungsdialog erscheint
-3. Bestätigen
-4. Room verschwindet aus der Liste
-
-**Erwartetes Ergebnis:** Room ist weg, kein Reload nötig
+1. Löschen-Button → Bestätigungsdialog → bestätigen
+2. Room verschwindet aus Liste ohne Reload
 
 ---
 
-## 6. Admin-Frontend – LobbyPage
+## 7. Admin-Frontend – LobbyPage
 
-**Ziel:** Alle Lobby-Funktionen testen.
+### 7.1 QR-Code anzeigen & scannen
 
-**Vorbereitung:** Einen Room erstellen und zur LobbyPage navigieren.
+1. QR-Code sichtbar, zeigt auf Player-Frontend-URL mit Room-Code
+2. Smartphone scannen → Player-Frontend öffnet sich
 
-### 6.1 QR-Code anzeigen
+### 7.2 Room-Code kopieren
 
-1. LobbyPage öffnen
-2. QR-Code ist sichtbar
+"Code kopieren"-Button → Strg+V → 6-stelliger Code
 
-**Erwartetes Ergebnis:** QR-Code wird gerendert und zeigt auf Player-Frontend-URL mit Room-Code
+### 7.3 Spieler live sehen
 
-### 6.2 QR-Code scannen
+1. Player-Frontend in anderem Tab → Room-Code eingeben → beitreten
+2. LobbyPage zeigt Spieler ohne Reload mit "Online"-Badge
 
-1. Smartphone (im gleichen WLAN)
-2. QR-Code scannen
-3. Player-Frontend öffnet sich im Browser des Smartphones
+### 7.4 Spieler-Reihenfolge
 
-**Erwartetes Ergebnis:** `http://192.168.178.130/` öffnet sich mit vorausgefülltem Code
+- Drag & Drop → Reihenfolge bleibt nach Loslassen
+- Shuffle-Button → Reihenfolge ändert sich zufällig
 
-### 6.3 Room-Code kopieren
+### 7.5 Spieler kicken (Browser)
 
-1. "Code kopieren"-Button klicken
-2. Code in ein Textfeld einfügen (Strg+V)
+1. Kick-Button neben Spieler klicken
+2. Spieler verschwindet aus Lobby; auf Player-Seite: Rückkehr zur JoinPage
 
-**Erwartetes Ergebnis:** 6-stelliger Room-Code in der Zwischenablage
+### 7.6 Spiel starten
 
-### 6.4 Spiel-Typ wechsel
-
-1. Dropdown für Spieltyp ist sichtbar (Standard: "jeopardy")
-2. Anderen Typ auswählen (falls verfügbar) und bestätigen
-3. GAME_SWITCHED-Message sollte in den WebSocket-Clients ankommen
-
-**Erwartetes Ergebnis:** Typ wechselt, Bestätigung sichtbar
-
-### 6.5 Spieler beitreten sehen
-
-1. Player-Frontend in einem anderen Tab öffnen
-2. Room-Code eingeben und beitreten
-3. In der LobbyPage erscheint der Spieler live (ohne Reload)
-
-**Erwartetes Ergebnis:** Name des Spielers in der Spielerliste mit grünem "Online"-Badge
-
-### 6.6 Spieler-Reihenfolge per Drag & Drop
-
-1. Mindestens 2 Spieler sind in der Lobby
-2. Spieler-Karten per Drag & Drop neu anordnen
-3. Reihenfolge wird gespeichert
-
-**Erwartetes Ergebnis:** Neue Reihenfolge bleibt nach Loslassen erhalten
-
-### 6.7 Spieler shufflen
-
-1. "Shuffle"-Button klicken
-2. Spieler-Reihenfolge ändert sich zufällig
-
-**Erwartetes Ergebnis:** Reihenfolge ist anders als zuvor
-
-### 6.8 Spiel starten
-
-**Vorbereitung:**
-- Ein Quiz muss in den Room geladen sein. Entweder:
-  - **Per curl** (Terminal): Test 4.1 durchführen → `curl -X POST .../quiz -d @/tmp/quiz.json`
-  - **Per Builder** (Browser): Quiz im Builder bauen und über "Upload to Room" hochladen (Test 7.8)
-- Mindestens 1 Spieler muss in der Lobby sein (Test 6.5)
-
-> Ohne Quiz lässt sich das Spiel **nicht starten** – der Button bleibt deaktiviert oder zeigt einen Fehler.
-
-1. "Spiel starten"-Button klicken
-2. Admin wird zur ControlPage navigiert
-3. Player wechseln automatisch von WaitingPage zu GamePage
-
-**Erwartetes Ergebnis:** Alle Clients sind in der Game-Phase, Board ist sichtbar
+**Vorbereitung:** Quiz geladen (siehe 5.1), mind. 1 Spieler in Lobby  
+1. "Spiel starten"-Button
+2. Admin → ControlPage; Player → GamePage
 
 ---
 
-## 7. Admin-Frontend – Quiz-Builder
+## 8. Admin-Frontend – Quiz-Builder
 
-**Ziel:** Quiz-Erstellung und Import/Export testen.
+### 8.1–8.5 Basis-Funktionen
 
-### 7.1 Quiz-Builder öffnen
+| Test | Aktion | Erwartet |
+|------|--------|----------|
+| 8.1 | Builder öffnen (`/builder/jeopardy`) | Lädt ohne Fehler |
+| 8.2 | Kategorie hinzufügen | Neue Spalte sichtbar |
+| 8.3 | Frage hinzufügen (Text, Antwort, Punkte) | Frage erscheint |
+| 8.4 | Media hochladen | Bild-URL erscheint im Feld |
+| 8.5 | Fragen Drag & Drop | Reihenfolge bleibt |
 
-1. Navigation zu `/builder/jeopardy` (Link im Admin-Frontend)
-2. Leeres Quiz-Board erscheint
+### 8.6 JSON exportieren
 
-**Erwartetes Ergebnis:** Builder-Seite lädt ohne Fehler
+"Export JSON" → `quiz.json` wird heruntergeladen, Inhalt valides JSON
 
-### 7.2 Kategorie hinzufügen
+### 8.7 JSON importieren
 
-1. "Kategorie hinzufügen"-Button klicken
-2. Kategoriename eingeben: "Testgeografie"
-3. Kategorie erscheint im Builder
+"Import JSON" → `quiz.json` vom lokalen Rechner → Kategorien erscheinen im Builder
 
-**Erwartetes Ergebnis:** Neue Kategorie-Spalte sichtbar
+### 8.8 In Library speichern
 
-### 7.3 Frage hinzufügen
+1. Quiz im Builder aufgebaut
+2. "In Library speichern"-Button → Name eingeben → bestätigen
+3. Quiz erscheint in der Library-Liste
 
-1. In der neuen Kategorie eine Frage hinzufügen
-2. Frage-Text: "Hauptstadt von Frankreich?"
-3. Antwort: "Paris"
-4. Punkte: 100
+### 8.9 Quiz zu Room hochladen
 
-**Erwartetes Ergebnis:** Frage erscheint in der Kategorie
-
-### 7.4 Media hochladen (im Builder)
-
-1. Bei einer Frage den Upload-Button für Bild klicken
-2. `test.png` auswählen
-3. URL wird gesetzt
-
-**Erwartetes Ergebnis:** Bild-URL erscheint im Feld der Frage
-
-### 7.5 Fragen-Reihenfolge per Drag & Drop
-
-1. Mehrere Fragen in einer Kategorie erstellen
-2. Fragen per Drag & Drop neu anordnen
-
-**Erwartetes Ergebnis:** Neue Reihenfolge bleibt erhalten
-
-### 7.6 Quiz als JSON exportieren
-
-1. "Export JSON"-Button klicken
-2. Datei wird heruntergeladen
-
-**Erwartetes Ergebnis:** `quiz.json` wird heruntergeladen, Inhalt ist valides JSON
-
-### 7.7 Quiz aus JSON importieren
-
-> **Hinweis:** Der Browser-Datei-Dialog zeigt Dateien auf deinem **lokalen Rechner**, nicht auf dem Server. `/tmp/quiz.json` liegt auf dem Server (`192.168.178.130`). Du hast zwei Möglichkeiten:
-> - **Option A:** Datei vorher auf deinen lokalen Rechner herunterladen (z.B. per `scp devboy@192.168.178.130:/tmp/quiz.json ~/Downloads/`)
-> - **Option B:** Den Dateiinhalt aus Sektion 1 kopieren, lokal als `quiz.json` speichern, dann auswählen
-
-1. "Import JSON"-Button im Quiz-Builder klicken
-2. Datei-Dialog öffnet sich → `quiz.json` vom lokalen Rechner auswählen
-3. Quiz wird geladen (kein Reload nötig, passiert sofort im Browser)
-
-**Erwartetes Ergebnis:** Kategorien "Geographie" und "Wissenschaft" mit je 2 Fragen erscheinen im Builder
-
-### 7.8 Quiz zu Room hochladen
-
-**Vorbereitung:** Ein Room muss existieren und sein Code bekannt sein (aus Test 5.2 oder 3.1).
-
-1. Im Quiz-Builder oben ein Feld für den Room-Code suchen (z.B. "Upload to Room" oder ähnliche Bezeichnung)
-2. Den 6-stelligen Room-Code eingeben (z.B. `ABCXYZ`)
-3. "Upload to Room"-Button klicken
-
-**Erwartetes Ergebnis:** Erfolgs-Meldung erscheint. Zur Kontrolle: `curl -s http://192.168.178.130/api/rooms/$CODE/export | jq .` sollte jetzt das Quiz zurückgeben.
+1. Room-Code eingeben
+2. "Upload to Room" → Erfolgs-Meldung
 
 ---
 
-## 8. Admin-Frontend – ControlPage
+## 9. Admin-Frontend – ControlPage
 
-**Ziel:** Spielsteuerung vollständig testen.
+### 9.1 Board & Fragen
 
-**Vorbereitung:** Spiel wurde gestartet (Test 6.8). Mindestens 2 Spieler im Spiel.
+1. Alle Kategorien als Spalten sichtbar
+2. Fragen als Buttons mit Punktwerten
 
-### 8.1 Board anzeigen
+### 9.2 Frage öffnen → Overlay
 
-1. ControlPage öffnen
-2. Alle Kategorien sind als Spalten sichtbar
-3. Fragen als Buttons mit Punktwerten
+Klick auf Frage → Overlay mit Text, Kategorie, Punkten; Phase → `ACTIVE_PLAYER_ANSWERING`
 
-**Erwartetes Ergebnis:** Board zeigt `2 Kategorien × 2 Fragen` (aus Beispiel-Quiz)
+### 9.3 Antwort aufdecken
 
-### 8.2 Frage öffnen
+"Antwort aufdecken" → korrekte Antwort sichtbar
 
-1. Auf eine Frage im Board klicken (z.B. "Geographie 100")
-2. Frage-Overlay erscheint
-3. Frage-Text ist sichtbar
-4. Phase wechselt zu `ACTIVE_PLAYER_ANSWERING`
+### 9.4 Richtig bewerten
 
-**Erwartetes Ergebnis:** Frage-Overlay mit Text, Kategorie, Punkten
+"✓ Richtig" → Punkte +100; Score-Strip aktuell; Frage als gespielt markiert
 
-### 8.3 Antwort aufdecken
+### 9.5 Falsch bewerten → Buzzer-Phase
 
-1. Im Frage-Overlay "Antwort aufdecken"-Button klicken
-2. Antwort erscheint im Overlay
+"✗ Falsch" → Phase `BUZZER_PHASE`; Spieler können buzzern
 
-**Erwartetes Ergebnis:** Korrekte Antwort ist jetzt sichtbar
+### 9.6 Buzzer-Antwort bewerten
 
-### 8.4 Antwort als "Richtig" bewerten
+| Bewertung | Erwartetes Delta |
+|-----------|-----------------|
+| Buzzer richtig | +50 (halbe Punkte) |
+| Buzzer falsch | -50, nächster Spieler kann buzzern |
 
-1. "✓ Richtig"-Button klicken
-2. Aktiver Spieler bekommt volle Punkte (`+100`)
-3. Score-Strip aktualisiert sich
-4. Frage-Overlay schließt sich (oder "Frage schließen" erscheint)
+### 9.7 Score manuell editieren
 
-**Erwartetes Ergebnis:** Spieler-Score erhöht sich, Frage im Board als gespielt markiert
+Klick auf Score → Eingabefeld → neuen Wert → bestätigen
 
-### 8.5 Antwort als "Falsch" bewerten (Buzzer-Phase)
+### 9.8 Timer starten/stoppen
 
-1. Neue Frage öffnen
-2. "✗ Falsch"-Button klicken
-3. Phase wechselt zu `BUZZER_PHASE`
-4. Spieler können buzzern
+1. Timer-Button → Countdown läuft bei allen Clients synchron
+2. Stopp-Button → Timer verschwindet bei allen Clients
 
-**Erwartetes Ergebnis:** Buzzer-Phase-Indikator erscheint, andere Spieler können buzzern
+### 9.9 Spiel beenden
 
-### 8.6 Buzzer-Antwort bewerten
-
-1. In Buzzer-Phase: Spieler buzzert (Player-Frontend)
-2. Admin sieht "Spieler X hat gebuzzert"
-3. Antwort bewerten (richtig oder falsch)
-
-**Erwartetes Ergebnis:** Scoring-Logik:
-- Buzzer richtig → `+50` (halbe Punkte bei 100er Frage)
-- Buzzer falsch → `-50`, nächster Spieler kann buzzern
-
-### 8.7 Score manuell editieren
-
-1. Auf den Score eines Spielers klicken
-2. Eingabefeld erscheint
-3. Neuen Wert eingeben und bestätigen
-
-**Erwartetes Ergebnis:** Score ändert sich auf den eingegebenen Wert
-
-### 8.8 Spiel beenden
-
-1. "Spiel beenden"-Button klicken
-2. GAME_OVER-Phase wird ausgelöst
-3. Admin sieht finale Rangliste
-4. Player werden zur EndPage navigiert
-
-**Erwartetes Ergebnis:** Alle Clients zeigen finale Scores
+"Spiel beenden" → `GAME_OVER`; Player → EndPage mit Rangliste
 
 ---
 
-## 9. Player-Frontend – JoinPage
+## 10. Player-Frontend – JoinPage
 
-**Ziel:** Eingabe-Validierung und Verbindung testen.
+### 10.1–10.8 Validierung & UX
 
-### 9.1 Seite lädt
-
-1. `http://192.168.178.130/` öffnen
-2. Eingabefelder für Code und Name sind sichtbar
-
-**Erwartetes Ergebnis:** Saubere JoinPage ohne Fehler
-
-### 9.2 Code-Eingabe Validierung
-
-| Eingabe | Erwartetes Verhalten |
-|---------|---------------------|
-| Leer | Join-Button deaktiviert oder Fehlermeldung |
-| Weniger als 6 Zeichen | Join-Button deaktiviert |
-| 6 Zeichen | Button wird aktiv |
-| Kleinbuchstaben | Automatisch in Großbuchstaben konvertiert |
-
-### 9.3 Name-Eingabe Validierung
-
-| Eingabe | Erwartetes Verhalten |
-|---------|---------------------|
-| Leer | Fehlermeldung beim Abschicken |
-| 1 Zeichen | OK |
-| 20 Zeichen | OK (Maximum) |
-| 21+ Zeichen | Eingabe wird auf 20 beschränkt |
-
-### 9.4 Erfolgreicher Join
-
-1. Gültigen Room-Code eingeben (aus Test 3.1)
-2. Name eingeben
-3. Enter drücken oder Button klicken
-
-**Erwartetes Ergebnis:** Navigation zu `/waiting`, Admin-LobbyPage zeigt den neuen Spieler
-
-### 9.5 Join mit falschem Code
-
-1. Nicht-existierenden Code eingeben (z.B. `XXXXXX`)
-2. Absenden
-
-**Erwartetes Ergebnis:** Fehlermeldung "Room nicht gefunden" oder ähnlich, bleibt auf JoinPage
-
-### 9.6 Code-Dots Animation
-
-1. Buchstaben eintippen
-2. 6 Punkte unter dem Eingabefeld zeigen den Eingabe-Fortschritt (grau → farbig)
-
-**Erwartetes Ergebnis:** Dots füllen sich mit jedem Zeichen
+| Test | Eingabe | Erwartet |
+|------|---------|----------|
+| 10.1 | Seite laden | Join-Formular sichtbar |
+| 10.2 | Leerer Code | Button deaktiviert |
+| 10.3 | Kleinbuchstaben | Auto-Großschreibung |
+| 10.4 | Leerer Name | Fehlermeldung beim Absenden |
+| 10.5 | Falscher Code | Fehlermeldung, bleibt auf JoinPage |
+| 10.6 | Gültiger Join | Navigation zu `/waiting` |
+| 10.7 | Enter-Taste | Formular abgeschickt |
+| 10.8 | Code-Dots | Füllen sich mit jedem Zeichen |
 
 ---
 
-## 10. Player-Frontend – WaitingPage
+## 11. Player-Frontend – WaitingPage
 
-**Ziel:** Warte-Zustand und automatische Navigation testen.
+### 11.1 Warteansicht
 
-**Vorbereitung:** Spieler ist der Lobby beigetreten, Spiel noch nicht gestartet.
+"Warte auf Spiel"-Anzeige; kein Fehler
 
-### 10.1 Warte-Anzeige
+### 11.2 Auto-Navigation zum Spiel
 
-1. Nach dem Join zur WaitingPage navigieren
-2. "Warte auf Spiel…"-Meldung ist sichtbar
+Admin startet Spiel → Player wechselt automatisch zu `/game`
 
-**Erwartetes Ergebnis:** Ladeanimation oder Warteanzeige, kein Fehler
+### 11.3 Auto-Navigation zur JoinPage
 
-### 10.2 Automatische Navigation zum Spiel
-
-1. Admin startet das Spiel (Test 6.8)
-2. WaitingPage navigiert automatisch zu `/game`
-
-**Erwartetes Ergebnis:** Player landet auf der GamePage ohne manuelles Reload
-
-### 10.3 Automatische Navigation zurück zur JoinPage
-
-1. Spieler ist in der WaitingPage
-2. Admin löscht den Room (oder setzt zurück)
-3. Player wird zu `/` navigiert
-
-**Erwartetes Ergebnis:** Player-Frontend zeigt wieder die JoinPage
+Admin löscht Room → Player kehrt automatisch zu `/` zurück
 
 ---
 
-## 11. Player-Frontend – JeopardyGame
+## 12. Player-Frontend – JeopardyGame
 
-**Ziel:** Spieler-Interface vollständig testen.
+### 12.1 Board
 
-**Vorbereitung:** Spiel ist gestartet, Spieler ist auf der GamePage.
+Kategorien und Punktwerte sichtbar
 
-### 11.1 Board anzeigen
+### 12.2 Frage-Overlay
 
-1. GamePage öffnen
-2. Kategorien und Fragen sind sichtbar
+Admin öffnet Frage → Overlay erscheint automatisch beim Player
 
-**Erwartetes Ergebnis:** Board mit Kategorien und Punktwerten
+### 12.3 Status-Bar
 
-### 11.2 Frage-Overlay bei QUESTION_OPENED
+Zeigt aktuelle Phase und aktiven Spieler
 
-1. Admin öffnet eine Frage
-2. Player sieht automatisch das Frage-Overlay mit Text und Kategorie
+### 12.4–12.7 Buzzer-Zustände
 
-**Erwartetes Ergebnis:** Frage erscheint ohne Interaktion des Spielers
+| Zustand | Aussehen |
+|---------|---------|
+| Nicht an der Reihe | Grau/inaktiv |
+| Buzzer offen | Gold/aktiv |
+| Selbst gebuzzert | Hervorgehoben |
+| Anderer gebuzzert | Deaktiviert |
 
-### 11.3 Status-Bar
+Buzzern per Klick und per Leertaste
 
-1. Status-Bar oben zeigt:
-   - Aktuelle Phase (z.B. "ACTIVE_PLAYER_ANSWERING")
-   - Name des aktiven Spielers
+### 12.8 Antwort-Feedback
 
-**Erwartetes Ergebnis:** Status ist korrekt und aktuell
+Richtig → grünes ✓; Falsch → rotes ✗ (kurz, dann weg)
 
-### 11.4 Buzzer-Button – Zustände
+### 12.9 Score-Delta-Animation
 
-| Zustand | Beschreibung | Erwartetes Aussehen |
-|---------|-------------|---------------------|
-| Nicht an der Reihe | Normaler Spieler wartet | Grau/inaktiv |
-| Buzzer offen | Phase = BUZZER_PHASE, noch nicht gebuzzert | Gold/aktiv |
-| Selbst gebuzzert | Spieler hat bereits gebuzzert | Gold/hervorgehoben |
-| Anderer gebuzzert | Anderer Spieler war schneller | Deaktiviert |
+Animierter Delta-Wert (+100 / -50) erscheint kurz im Score-Strip
 
-### 11.5 Buzzern mit Klick
+### 12.10 Sound-Effekte
 
-1. Phase = `BUZZER_PHASE` und Spieler noch nicht gebuzzert
-2. Buzzer-Button klicken
-3. Admin sieht "Spieler X hat gebuzzert"
-
-**Erwartetes Ergebnis:** PLAYER_BUZZED wird gesendet, Admin-Ansicht aktualisiert
-
-### 11.6 Buzzern mit Leertaste
-
-1. Phase = `BUZZER_PHASE`, Buzzer aktiv
-2. Leertaste drücken
-
-**Erwartetes Ergebnis:** Gleiches Ergebnis wie Klick
-
-### 11.7 Antwort-Feedback
-
-1. Admin bewertet Antwort als richtig
-2. Spieler sieht grünes Feedback (✓)
-
-1. Admin bewertet Antwort als falsch
-2. Spieler sieht rotes Feedback (✗)
-
-**Erwartetes Ergebnis:** Farb-Feedback erscheint kurz und verschwindet dann
-
-### 11.8 Score-Delta-Animation
-
-1. Admin bewertet Antwort
-2. Score-Strip zeigt animierten Delta-Wert (+100 oder -50)
-
-**Erwartetes Ergebnis:** Kurze Animation mit Punktänderung sichtbar
-
-### 11.9 Sound-Effekte
-
-1. Buzzer öffnet → Buzzer-Sound spielt
-2. Richtige Antwort → Correct-Sound
-3. Falsche Antwort → Wrong-Sound
-
-**Erwartetes Ergebnis:** Töne sind hörbar (Lautstärke auf dem Gerät prüfen)
+Buzzer öffnet → Buzzer-Sound; Richtig → Correct-Sound; Falsch → Wrong-Sound
 
 ---
 
-## 12. Player-Frontend – EndPage
+## 13. Player-Frontend – EndPage
 
-**Ziel:** Finale Rangliste testen.
-
-**Vorbereitung:** Admin hat Spiel beendet (Test 8.8).
-
-### 12.1 Rangliste anzeigen
-
-1. EndPage erscheint automatisch
-2. Alle Spieler mit Scores in absteigender Reihenfolge
-
-**Erwartetes Ergebnis:** Rangliste mit korrekter Reihenfolge
-
-### 12.2 Medaillen
-
-1. Platz 1 hat 🥇, Platz 2 🥈, Platz 3 🥉
-
-**Erwartetes Ergebnis:** Medaillen-Emojis korrekt zugeordnet
-
-### 12.3 Eigene Position hervorgehoben
-
-1. Spieler sieht seinen eigenen Eintrag hervorgehoben
-
-**Erwartetes Ergebnis:** Eigener Name/Score ist visuell unterscheidbar
-
-### 12.4 "Neues Spiel"-Button
-
-1. Button klicken
-2. Navigation zurück zu `/`
-
-**Erwartetes Ergebnis:** JoinPage erscheint
+| Test | Erwartet |
+|------|---------|
+| 13.1 | Rangliste in korrekter Reihenfolge |
+| 13.2 | Medaillen 🥇🥈🥉 korrekt |
+| 13.3 | Eigene Position hervorgehoben |
+| 13.4 | "Neues Spiel" → JoinPage |
 
 ---
 
-## 13. Vollständiger Spielablauf (Integration)
+## 14. Vollständiger Spielablauf (Integration)
 
-**Ziel:** Kompletten Spielablauf von Anfang bis Ende durchspielen.
-
-**Setup:**
-- 1× Admin-Browser (Desktop)
-- 2× Player-Browser (Inkognito-Tab oder Smartphone)
+**Setup:** 1× Admin-Browser, 2× Player (Inkognito-Tab oder Smartphone)
 
 ### Phase 1 – Vorbereitung
 
-1. Admin: `http://192.168.178.130/admin` öffnen
-2. Admin: "Neuen Room erstellen" klicken → Code merken
-3. Admin: Zur LobbyPage navigieren
-4. Admin: Quiz hochladen – entweder:
-   - **Per Terminal:** `curl -s -X POST http://192.168.178.130/api/rooms/$CODE/quiz -H "Content-Type: application/json" -d @/tmp/quiz.json`
-   - **Per Browser:** `/admin/builder/jeopardy` öffnen → Import JSON → quiz.json auswählen → Room-Code eingeben → "Upload to Room"
-5. Player 1: `http://192.168.178.130/` öffnen, Code eingeben, Name "Alice", beitreten
-6. Player 2: Inkognito-Tab, gleiche URL, Name "Bob", beitreten
-7. Admin: Beide Spieler erscheinen in der Lobby
+```bash
+# Terminal-Alternative für Quiz-Upload:
+curl -s -X POST http://192.168.178.130/api/rooms/$CODE/quiz \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" -d @/tmp/quiz.json
+```
 
-**Checkpoint:** Beide Spieler sind online in der LobbyPage sichtbar ✓
+1. Admin: Room erstellen → zur LobbyPage
+2. Admin: Quiz laden
+3. Player 1 (Alice) und Player 2 (Bob) beitreten
+4. **Checkpoint:** Beide Spieler in der Lobby ✓
 
 ### Phase 2 – Spielstart
 
-8. Admin: Spieler-Reihenfolge prüfen (Alice zuerst, dann Bob)
-9. Admin: "Spiel starten" klicken
-10. Alle drei Clients navigieren automatisch zur Game-Ansicht
+5. Admin: "Spiel starten"
+6. **Checkpoint:** Admin auf ControlPage, Player auf GamePage ✓
 
-**Checkpoint:** Admin auf ControlPage, Player auf GamePage ✓
+### Phase 3 – Aktiver Spieler richtig
 
-### Phase 3 – Erste Frage (Aktiver Spieler richtig)
+7. Admin: "Geographie 100" öffnen → Antwort aufdecken → "✓ Richtig"
+8. **Checkpoint:** Alice +100 Punkte ✓
 
-11. Admin: "Geographie 100" klicken → Frage öffnet sich
-12. Admin: Antwort aufdecken (Berlin)
-13. Admin: "✓ Richtig" klicken
-14. Alice bekommt +100 Punkte, Score-Update sichtbar
+### Phase 4 – Buzzer-Flow
 
-**Checkpoint:** Alice hat 100 Punkte, Bob hat 0 ✓
+9. Admin: Nächste Frage (Bob aktiv) → "✗ Falsch" → Buzzer-Phase
+10. Alice buzzert → Admin: "✓ Richtig"
+11. **Checkpoint:** Alice 150, Bob -50 ✓
 
-### Phase 4 – Zweite Frage (Aktiver Spieler falsch, Buzzer)
+### Phase 5 – Spielende
 
-15. Admin: "Wissenschaft 100" klicken (nächste Frage, jetzt ist Bob aktiv)
-16. Admin: "✗ Falsch" klicken → Buzzer-Phase startet, Bob bekommt -50
-17. Alice: Buzzer-Button erscheint als aktiv (gold)
-18. Alice: Buzzer klicken → Admin sieht "Alice hat gebuzzert"
-19. Admin: Antwort aufdecken (H2O)
-20. Admin: "✓ Richtig" klicken → Alice bekommt +50
-
-**Checkpoint:** Alice hat 150, Bob hat -50 ✓
-
-### Phase 5 – Negative Scores
-
-21. Admin: Weitere Frage öffnen
-22. Admin: "✗ Falsch" → Buzzer-Phase
-23. Alice: Buzzert → Admin bewertet als Falsch
-24. Alice Score sinkt unter Ausgangswert
-
-**Checkpoint:** Negative Scores möglich und werden korrekt angezeigt ✓
-
-### Phase 6 – Spielende
-
-25. Admin: Alle Fragen spielen oder "Spiel beenden" klicken
-26. Alle Clients zeigen GAME_OVER
-27. Player-EndPage zeigt finale Rangliste
-
-**Checkpoint:** Rangliste korrekt, Platz 1 mit höchstem Score ✓
+12. Admin: "Spiel beenden"
+13. **Checkpoint:** Alle Clients → Rangliste, korrekte Reihenfolge ✓
 
 ---
 
-## 14. Edge Cases & Fehlerszenarien
+## 15. Multi-Board-Flow
 
-### 14.1 Player Disconnect & Reconnect
+**Vorbereitung:** Laufendes Spiel, mindestens ein Board komplett gespielt.
 
-1. Spieler ist im Spiel
-2. Browser-Tab schließen
-3. Admin-LobbyPage/ControlPage: Spieler zeigt "Offline"-Badge
-4. Gleichen Tab wieder öffnen, gleichen Code + Namen eingeben
-5. Spieler reconnectet mit gleicher ID
+### 15.1 Board abgeschlossen
 
-**Erwartetes Ergebnis:** Score bleibt erhalten, Spieler erscheint wieder als "Online"
+Alle Fragen eines Boards gespielt → Phase wechselt zu `BOARD_COMPLETE`  
+**Erwartet:** Player sehen Wartescreen, Admin sieht Board-Auswahl
 
-### 14.2 Multiple Buzzer gleichzeitig
+### 15.2 Nächstes Board laden
 
-1. Buzzer-Phase ist aktiv
-2. Beide Spieler drücken gleichzeitig den Buzzer
-3. Nur einer wird als gebuzzert angezeigt
+1. Admin: "Nächstes Board laden" → Board aus Library auswählen
+2. Neues Board erscheint im ControlPage
+3. Player sehen neues Board
 
-**Erwartetes Ergebnis:** Erster Buzzer gewinnt, nur einer ist aktiv
+**Erwartet:** Scores bleiben erhalten, Board wird ersetzt
 
-### 14.3 Buzzer außerhalb der Phase
+### 15.3 Spiel beenden nach mehreren Boards
 
-1. Phase ist `ACTIVE_PLAYER_ANSWERING` (nicht Buzzer-Phase)
-2. Spieler versucht zu buzzern
-
-**Erwartetes Ergebnis:** Buzzer wird ignoriert oder Fehlermeldung
-
-### 14.4 Score manuell auf negativen Wert setzen
-
-1. Admin klickt auf Score eines Spielers
-2. Negativen Wert eingeben (z.B. `-999`)
-3. Bestätigen
-
-**Erwartetes Ergebnis:** Score wird auf -999 gesetzt, korrekt angezeigt
-
-### 14.5 Spiel-Typ wechsel nur in LOBBY
-
-1. Laufendes Spiel (IN_PROGRESS)
-2. Versuche Spieltyp zu wechseln
-
-**Erwartetes Ergebnis:** Wechsel ist nicht möglich (Button deaktiviert oder Fehler)
-
-### 14.6 Quiz neu laden überschreibt altes
-
-1. Quiz in Room laden
-2. Anderes Quiz hochladen
-3. Altes Board wird ersetzt
-
-**Erwartetes Ergebnis:** Nur das neue Quiz ist aktiv
-
-### 14.7 Room Auto-Cleanup
-
-> Dieser Test dauert sehr lange – nur bei Bedarf durchführen.
-
-1. Room erstellen, kein Spieler beitreten
-2. 30 Minuten warten
-3. Room erscheint nicht mehr in der Liste
-
-**Erwartetes Ergebnis:** Leere LOBBY-Rooms werden nach 30 Min. gelöscht
-
-### 14.8 Reconnect nach Admin-State
-
-1. Admin ist auf ControlPage
-2. Browser-Tab neu laden
-3. Admin-State (Board, Scores, Phase) wird wiederhergestellt
-
-**Erwartetes Ergebnis:** Admin sieht korrekten Spielzustand nach Reload
+Admin: "Spiel beenden" → Finale Rangliste mit akkumulierten Scores
 
 ---
 
-## 15. Checkliste
+## 16. Edge Cases & Fehlerszenarien
 
-### Smoke Tests
+### 16.1 Player Disconnect & Reconnect
 
-- [ ] **ST-1** Backend API `/api/rooms` antwortet mit HTTP 200
-- [ ] **ST-2** Admin-Frontend lädt ohne Fehler
-- [ ] **ST-3** Player-Frontend lädt ohne Fehler
-- [ ] **ST-4** WebSocket-Verbindung aufbaubar
+1. Player-Tab schließen → "Offline"-Badge in Lobby/ControlPage
+2. Gleichen Tab öffnen, gleichen Code + Namen → Reconnect mit gleicher ID
+3. **Erwartet:** Score erhalten, wieder "Online"
 
-### REST API – Room-Management
+### 16.2 Simultaner Buzzer
 
-- [ ] **RM-1** POST /api/rooms → 6-stelliger Code, LOBBY-Phase
-- [ ] **RM-2** GET /api/rooms → Room in der Liste
-- [ ] **RM-3** GET /api/rooms/:code → Room-Details korrekt
-- [ ] **RM-4** DELETE /api/rooms/:code → Room gelöscht, GET danach 404
-- [ ] **RM-5** POST /players/order → HTTP 200
-- [ ] **RM-6** POST /players/shuffle → HTTP 200
+Beide Spieler drücken gleichzeitig den Buzzer  
+**Erwartet:** Nur erster wird angenommen
 
-### REST API – Quiz & Media
+### 16.3 Buzzer außerhalb der Phase
 
-- [ ] **QM-1** POST /quiz → Quiz hochladen, Board zurückgegeben
-- [ ] **QM-2** GET /export → Quiz-JSON vollständig und korrekt
-- [ ] **QM-3** POST /media/upload (PNG) → URL zurückgegeben
-- [ ] **QM-4** GET /media/:file → HTTP 200, korrekter Content-Type
-- [ ] **QM-5** POST /media/upload (TXT) → HTTP 400/415 Fehler
+Phase ≠ `BUZZER_PHASE` → Buzzer-Klick ignoriert
 
-### Admin-Frontend – HomePage
+### 16.4 Score auf negativen Wert setzen
 
-- [ ] **AH-1** Rooms-Liste zeigt erstellte Rooms
-- [ ] **AH-2** Neuen Room erstellen → erscheint in Liste
-- [ ] **AH-3** LOBBY-Room öffnen → LobbyPage
-- [ ] **AH-4** IN_PROGRESS-Room öffnen → ControlPage
-- [ ] **AH-5** Room löschen mit Bestätigung → verschwindet aus Liste
+Admin setzt Score manuell auf `-999` → korrekt angezeigt
 
-### Admin-Frontend – LobbyPage
+### 16.5 Spieltyp-Wechsel nur in LOBBY
 
-- [ ] **AL-1** QR-Code wird angezeigt
-- [ ] **AL-2** QR-Code führt zum Player-Frontend
-- [ ] **AL-3** Room-Code kopierbar
-- [ ] **AL-4** Spieler erscheint live nach Join
-- [ ] **AL-5** Drag & Drop Reihenfolge funktioniert
-- [ ] **AL-6** Shuffle ändert Reihenfolge
-- [ ] **AL-7** Spiel starten → ControlPage + Player auf GamePage
+Laufendes Spiel → Spieltyp-Wechsel nicht möglich
 
-### Admin-Frontend – Quiz-Builder
+### 16.6 Quiz neu laden überschreibt altes
 
-- [ ] **QB-1** Builder-Seite lädt
-- [ ] **QB-2** Kategorie hinzufügen
-- [ ] **QB-3** Frage hinzufügen (Text, Antwort, Punkte)
-- [ ] **QB-4** Media-Upload funktioniert
-- [ ] **QB-5** Fragen Drag & Drop Reihenfolge
-- [ ] **QB-6** JSON exportieren (Download)
-- [ ] **QB-7** JSON importieren (Quiz erscheint im Builder)
-- [ ] **QB-8** Quiz zu Room hochladen
+Anderes Quiz hochladen → altes Board ersetzt, nur neues Quiz aktiv
 
-### Admin-Frontend – ControlPage
+### 16.7 Admin-State nach Reload
 
-- [ ] **AC-1** Board zeigt alle Kategorien und Fragen
-- [ ] **AC-2** Frage öffnen → Overlay erscheint, Phase wechselt
-- [ ] **AC-3** Antwort aufdecken
-- [ ] **AC-4** Richtig bewerten → Punkte, Frage gespielt
-- [ ] **AC-5** Falsch bewerten → Buzzer-Phase startet
-- [ ] **AC-6** Buzzer-Antwort richtig bewerten → halbe Punkte
-- [ ] **AC-7** Buzzer-Antwort falsch → nächster Spieler kann buzzern
-- [ ] **AC-8** Score manuell editieren
-- [ ] **AC-9** Spiel beenden → GAME_OVER, Player auf EndPage
+Admin auf ControlPage → Browser-Tab neu laden → Spielzustand (Board, Scores, Phase) wiederhergestellt
 
-### Player-Frontend – JoinPage
+### 16.8 Room Auto-Cleanup
 
-- [ ] **PJ-1** Seite lädt
-- [ ] **PJ-2** Leerer Code → Button deaktiviert
-- [ ] **PJ-3** Kleinbuchstaben werden automatisch großgeschrieben
-- [ ] **PJ-4** Leerer Name → Fehlermeldung
-- [ ] **PJ-5** Falscher Code → Fehlermeldung
-- [ ] **PJ-6** Gültiger Join → WaitingPage
-- [ ] **PJ-7** Enter-Taste funktioniert
-- [ ] **PJ-8** Code-Dots zeigen Eingabe-Fortschritt
+> Nur bei Bedarf: 30 Minuten warten, leere LOBBY-Rooms verschwinden automatisch.
 
-### Player-Frontend – WaitingPage
+---
 
-- [ ] **PW-1** "Warte auf Spiel"-Anzeige sichtbar
-- [ ] **PW-2** Auto-Navigation zu GamePage bei Spielstart
-- [ ] **PW-3** Auto-Navigation zu JoinPage wenn Room gelöscht
+## 17. Checkliste
 
-### Player-Frontend – JeopardyGame
+### Automatisiert (Go-Tests – `make test`)
 
-- [ ] **PG-1** Board mit Kategorien und Fragen sichtbar
-- [ ] **PG-2** Frage-Overlay erscheint bei QUESTION_OPENED
-- [ ] **PG-3** Status-Bar zeigt Phase und aktiven Spieler
-- [ ] **PG-4** Buzzer-Button inaktiv wenn nicht an der Reihe
-- [ ] **PG-5** Buzzer-Button aktiv in Buzzer-Phase
-- [ ] **PG-6** Buzzern per Klick
-- [ ] **PG-7** Buzzern per Leertaste
-- [ ] **PG-8** Antwort-Feedback grün bei richtig
-- [ ] **PG-9** Antwort-Feedback rot bei falsch
-- [ ] **PG-10** Score-Delta-Animation sichtbar
-- [ ] **PG-11** Sound-Effekte (Buzzer, Richtig, Falsch)
+- [x] Alle REST-Endpunkte für Room-Management
+- [x] Quiz hochladen, exportieren, Board-Limits
+- [x] Spielstart, Spielende, Fragen-Flow
+- [x] Antwort-Scoring (richtig/falsch/Buzzer)
+- [x] Spieler-Management (Order, Shuffle, Kick, Score)
+- [x] Timer starten / stoppen
+- [x] Öffentlicher Room-Info-Endpunkt (kein Auth)
+- [x] Auth-Middleware (401 ohne Token, 200 mit Token)
+- [x] CORS-Header und Preflight
+- [x] Library CRUD (GET Liste, GET Detail, POST, PUT, DELETE)
+- [x] Library Auth-Schutz für Write-Ops
+- [x] Media-Upload (PNG gültig, Text ungültig, Persistenz)
 
-### Player-Frontend – EndPage
+### Smoke Tests (manuell)
 
-- [ ] **PE-1** Rangliste in korrekter Reihenfolge
-- [ ] **PE-2** Medaillen 🥇🥈🥉 korrekt
-- [ ] **PE-3** Eigene Position hervorgehoben
-- [ ] **PE-4** "Neues Spiel" → JoinPage
+- [ ] **ST-1** Backend `/api/rooms` mit Token → 200
+- [ ] **ST-2** Backend `/api/rooms` ohne Token → 401
+- [ ] **ST-3** Admin-Frontend lädt, zeigt Login-Seite
+- [ ] **ST-4** Player-Frontend lädt, zeigt Join-Formular
+- [ ] **ST-5** WebSocket-Verbindung aufbaubar
 
-### Integration
+### Auth-Flow (manuell)
 
-- [ ] **IN-1** Vollständiger Spielablauf: Vorbereitung (Room + Quiz + Spieler)
-- [ ] **IN-2** Vollständiger Spielablauf: Aktiver Spieler richtig → Punkte
-- [ ] **IN-3** Vollständiger Spielablauf: Aktiver Spieler falsch → Buzzer-Phase
-- [ ] **IN-4** Vollständiger Spielablauf: Buzzer richtig → halbe Punkte
-- [ ] **IN-5** Vollständiger Spielablauf: Spielende → korrekte Rangliste
+- [ ] **AF-1** Login mit korrektem Token → Zugang
+- [ ] **AF-2** Login mit falschem Token → Fehlermeldung
+- [ ] **AF-3** Token persistiert nach Reload
+- [ ] **AF-4** `/api/room-info/:code` ohne Token → 200
 
-### Edge Cases
+### REST API (manuell / curl)
 
-- [ ] **EC-1** Player disconnect → Offline-Badge
-- [ ] **EC-2** Player reconnect → Score erhalten, wieder Online
-- [ ] **EC-3** Simultaner Buzzer → nur erster wird angenommen
-- [ ] **EC-4** Buzzer außerhalb Buzzer-Phase → ignoriert
-- [ ] **EC-5** Score manuell auf negativen Wert setzen
-- [ ] **EC-6** Spieltyp-Wechsel nur in LOBBY möglich
-- [ ] **EC-7** Quiz neu laden überschreibt altes Board
-- [ ] **EC-8** Admin-State nach Browser-Reload wiederhergestellt
+- [ ] **RM-1** POST /api/rooms → 201, 6-stelliger Code
+- [ ] **RM-2** GET /api/rooms → Room in Liste
+- [ ] **RM-3** DELETE /api/rooms/:code → 200; GET danach → 404
+- [ ] **RM-4** DELETE /api/rooms/:code/players/:id → Spieler entfernt
+- [ ] **QM-1** POST /quiz → Board korrekt
+- [ ] **QM-2** POST /quiz mit >6 Kategorien → 400
+- [ ] **QM-3** GET /export → Quiz vollständig
+- [ ] **QM-4** POST /media/upload (PNG) → URL zurück
+- [ ] **QM-5** POST /media/upload (TXT) → 400
+- [ ] **TM-1** POST /question/timer (seconds>0) → endsAt, durationMs
+- [ ] **TM-2** POST /question/timer (seconds=0) → stopped
+- [ ] **LB-1** GET /api/library → Liste (kein Auth)
+- [ ] **LB-2** POST /api/library → Quiz erstellt
+- [ ] **LB-3** DELETE /api/library/:id → Quiz gelöscht
+
+### Admin-Frontend (manuell)
+
+- [ ] **AH-1** Rooms-Liste, neu erstellen, öffnen, löschen
+- [ ] **AL-1** QR-Code, Spieler live, Drag & Drop, Shuffle, Kick, Spiel starten
+- [ ] **QB-1** Builder: Kategorie, Frage, Media, Export, Import, Library speichern, Upload to Room
+- [ ] **AC-1** Board, Frage öffnen, Antwort aufdecken, Richtig/Falsch, Buzzer, Timer, Score, Spiel beenden
+
+### Player-Frontend (manuell)
+
+- [ ] **PJ-1** Join-Validierung (leerer Code, Kleinbuchstaben, falscher Code, Dots)
+- [ ] **PW-1** Warteseite, Auto-Navigation bei Start und Room-Löschen
+- [ ] **PG-1** Board, Frage-Overlay, Status-Bar, Buzzer, Feedback, Delta-Animation, Sound
+- [ ] **PE-1** Rangliste, Medaillen, eigene Position, Neues Spiel
+
+### Integration (manuell)
+
+- [ ] **IN-1** Vollständiger Spielablauf: Vorbereitung → Spielstart → Scoring → Spielende
+- [ ] **IN-2** Multi-Board: Board komplett → nächstes laden → Scores akkumulieren
+- [ ] **EC-1** Disconnect/Reconnect (Score erhalten)
+- [ ] **EC-2** Simultaner Buzzer (nur erster gewinnt)
+- [ ] **EC-3** Admin-State nach Reload
