@@ -365,15 +365,12 @@ input { font-family: inherit; outline: none; transition: border-color 0.2s, box-
 }
 .game-board-scroll {
   flex: 1;
-  padding: 18px;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  align-items: center;
+  justify-content: center;
   min-height: 0;
   overflow: hidden;
   width: 100%;
-  max-width: calc((100vh - 175px) * 16 / 9);
-  margin: 0 auto;
 }
 .game-board-header {
   display: flex;
@@ -391,30 +388,43 @@ input { font-family: inherit; outline: none; transition: border-color 0.2s, box-
 }
 .game-board-grid {
   display: grid;
-  gap: 5px;
-  flex: 1;
-  min-height: 0;
 }
 .game-board-cat-header {
   background: #16213a;
   border: 1px solid #243050;
-  border-radius: 7px;
-  padding: 8px 4px;
+  border-radius: 8px;
+  padding: 20px;
+  box-sizing: border-box;
+  width: 300px;
+  height: 100px;
   text-align: center;
   font-weight: 700;
-  font-size: 11px;
+  font-size: 20px;
   letter-spacing: 1.5px;
   color: #9ab0d8;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
+}
+.game-board-cat-header span {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+  text-align: center;
 }
 .game-board-cell {
   background: var(--surface);
   border: 2px solid #1c2440;
-  border-radius: 7px;
+  border-radius: 8px;
+  padding: 20px;
+  box-sizing: border-box;
+  width: 300px;
+  height: 100px;
   color: var(--gold);
-  font-size: 22px;
+  font-size: 36px;
   font-weight: 800;
   display: flex;
   align-items: center;
@@ -790,8 +800,6 @@ input { font-family: inherit; outline: none; transition: border-color 0.2s, box-
 
   .game-board-header { padding: 4px 8px; }
   .game-board-label { font-size: 10px; }
-  .game-board-cat-header { font-size: 10px; padding: 4px 2px; }
-  .game-board-cell { font-size: 13px; }
 
   .question-overlay { padding: 6px; }
   .overlay-main-card { padding: 12px; }

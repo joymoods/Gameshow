@@ -412,6 +412,7 @@ export default function BuilderPage({ toast }: Props) {
                     value={cat.name}
                     onChange={(e) => renameCategory(cat.id, e.target.value)}
                     placeholder="Kategoriename"
+                    maxLength={50}
                   />
                   <span className="question-count">{cat.questions.length} Fragen</span>
                   <button

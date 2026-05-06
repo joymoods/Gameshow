@@ -554,32 +554,45 @@ input:focus, textarea:focus, select:focus { border-color: var(--primary); }
 
 .board-grid {
   display: grid;
-  gap: 6px;
-  flex: 1;
-  min-height: 0;
 }
 .board-category {
   background: #16213a;
   border: 1px solid #243050;
   border-radius: 8px;
-  padding: 10px 6px;
+  padding: 20px;
+  box-sizing: border-box;
+  width: 300px;
+  height: 100px;
   text-align: center;
   font-weight: 700;
-  font-size: 11px;
+  font-size: 20px;
   letter-spacing: 1.5px;
   color: #9ab0d8;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
+}
+.board-category span {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+  text-align: center;
 }
 .board-cell {
   background: var(--surface);
   border: 2px solid #1c2440;
   color: var(--gold);
-  font-size: 26px;
+  font-size: 36px;
   font-weight: 800;
   text-align: center;
   border-radius: 8px;
+  padding: 20px;
+  box-sizing: border-box;
+  width: 300px;
+  height: 100px;
   display: flex;
   align-items: center;
   justify-content: center;

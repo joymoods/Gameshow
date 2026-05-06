@@ -247,6 +247,26 @@ export default function JeopardyGame() {
 
   const numRows = board.length > 0 ? Math.max(...board.map((c) => c.questions.length)) : 5;
 
+  const CELL_W = 300, CELL_H = 100, CELL_GAP = 10;
+  const numCols = board.length || 6;
+  const totalRows = 1 + numRows;
+  const boardW = numCols * CELL_W + (numCols - 1) * CELL_GAP;
+  const boardH = totalRows * CELL_H + (totalRows - 1) * CELL_GAP;
+
+  const boardContainerRef = useRef<HTMLDivElement>(null);
+  const [boardScale, setBoardScale] = useState(1);
+
+  useEffect(() => {
+    const el = boardContainerRef.current;
+    if (!el) return;
+    const obs = new ResizeObserver(() => {
+      const s = Math.min(el.clientWidth / boardW, el.clientHeight / boardH, 1);
+      setBoardScale(s);
+    });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [boardW, boardH]);
+
   const imgUrl = mediaUrl(currentQuestion?.imageUrl);
   const audUrl = mediaUrl(currentQuestion?.audioUrl);
   const vidUrl = mediaUrl(currentQuestion?.videoUrl);
@@ -255,33 +275,39 @@ export default function JeopardyGame() {
     <div className="game-page">
       {/* Board area */}
       <div className="game-board-area">
-        <div className="game-board-scroll">
-          {gameLogo && (
-            <div className="game-board-logo-center">
-              <img src={gameLogo} alt="Logo" className="game-board-logo-center-img" />
+        {gameLogo && (
+          <div className="game-board-logo-center">
+            <img src={gameLogo} alt="Logo" className="game-board-logo-center-img" />
+          </div>
+        )}
+        <div ref={boardContainerRef} className="game-board-scroll">
+          <div style={{ width: boardW * boardScale, height: boardH * boardScale, flexShrink: 0 }}>
+            <div
+              className="game-board-grid"
+              style={{
+                width: boardW,
+                height: boardH,
+                transform: `scale(${boardScale})`,
+                transformOrigin: 'top left',
+                gridTemplateColumns: `repeat(${board.length}, ${CELL_W}px)`,
+                gap: CELL_GAP,
+              }}
+            >
+              {board.map((c) => (
+                <div key={c.id + 'h'} className="game-board-cat-header"><span>{c.name}</span></div>
+              ))}
+              {Array.from({ length: numRows }).map((_, ri) =>
+                board.map((c) => {
+                  const q = c.questions[ri];
+                  if (!q) return <div key={`e-${c.id}-${ri}`} />;
+                  return (
+                    <div key={q.id} className={`game-board-cell ${q.played ? 'played' : ''}`}>
+                      {q.played ? '' : q.points}
+                    </div>
+                  );
+                })
+              )}
             </div>
-          )}
-          <div
-            className="game-board-grid"
-            style={{
-              gridTemplateColumns: `repeat(${board.length}, 1fr)`,
-              gridTemplateRows: `auto repeat(${numRows}, minmax(0, 1fr))`,
-            }}
-          >
-            {board.map((c) => (
-              <div key={c.id + 'h'} className="game-board-cat-header">{c.name}</div>
-            ))}
-            {Array.from({ length: numRows }).map((_, ri) =>
-              board.map((c) => {
-                const q = c.questions[ri];
-                if (!q) return <div key={`e-${c.id}-${ri}`} />;
-                return (
-                  <div key={q.id} className={`game-board-cell ${q.played ? 'played' : ''}`}>
-                    {q.played ? '' : q.points}
-                  </div>
-                );
-              })
-            )}
           </div>
         </div>
 

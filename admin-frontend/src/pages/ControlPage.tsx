@@ -416,6 +416,26 @@ export default function ControlPage({ toast }: Props) {
 
   const numRows = board.length > 0 ? Math.max(...board.map((c) => c.questions.length)) : 5;
 
+  const CELL_W = 300, CELL_H = 100, CELL_GAP = 10;
+  const numCols = board.length || 6;
+  const totalRows = 1 + numRows;
+  const boardW = numCols * CELL_W + (numCols - 1) * CELL_GAP;
+  const boardH = totalRows * CELL_H + (totalRows - 1) * CELL_GAP;
+
+  const boardContainerRef = useRef<HTMLDivElement>(null);
+  const [boardScale, setBoardScale] = useState(1);
+
+  useEffect(() => {
+    const el = boardContainerRef.current;
+    if (!el) return;
+    const obs = new ResizeObserver(() => {
+      const s = Math.min(el.clientWidth / boardW, el.clientHeight / boardH, 1);
+      setBoardScale(s);
+    });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [boardW, boardH]);
+
   return (
     <div className="control-layout">
       {/* Left: Board */}
@@ -433,32 +453,43 @@ export default function ControlPage({ toast }: Props) {
         </div>
 
         <div
-          className="board-grid"
-          style={{
-            gridTemplateColumns: `repeat(${board.length}, 1fr)`,
-            gridTemplateRows: `auto repeat(${numRows}, 1fr)`,
-          }}
+          ref={boardContainerRef}
+          style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}
         >
-          {board.map((cat) => (
-            <div key={cat.id + 'h'} className="board-category">{cat.name}</div>
-          ))}
-          {Array.from({ length: numRows }).map((_, ri) =>
-            board.map((cat) => {
-              const q = cat.questions[ri];
-              if (!q) return <div key={`empty-${cat.id}-${ri}`} style={{ background: 'var(--bg)', borderRadius: 8 }} />;
-              const isActive = currentQuestion?.questionId === q.id;
-              return (
-                <button
-                  key={q.id}
-                  className={`board-cell ${q.played ? 'played' : ''} ${isActive ? 'active' : ''}`}
-                  onClick={() => openQuestion(q)}
-                  disabled={q.played || !!currentQuestion}
-                >
-                  {q.played ? '' : q.points}
-                </button>
-              );
-            })
-          )}
+          <div style={{ width: boardW * boardScale, height: boardH * boardScale, flexShrink: 0 }}>
+            <div
+              className="board-grid"
+              style={{
+                width: boardW,
+                height: boardH,
+                transform: `scale(${boardScale})`,
+                transformOrigin: 'top left',
+                gridTemplateColumns: `repeat(${board.length}, ${CELL_W}px)`,
+                gap: CELL_GAP,
+              }}
+            >
+              {board.map((cat) => (
+                <div key={cat.id + 'h'} className="board-category"><span>{cat.name}</span></div>
+              ))}
+              {Array.from({ length: numRows }).map((_, ri) =>
+                board.map((cat) => {
+                  const q = cat.questions[ri];
+                  if (!q) return <div key={`empty-${cat.id}-${ri}`} style={{ background: 'var(--bg)', borderRadius: 8 }} />;
+                  const isActive = currentQuestion?.questionId === q.id;
+                  return (
+                    <button
+                      key={q.id}
+                      className={`board-cell ${q.played ? 'played' : ''} ${isActive ? 'active' : ''}`}
+                      onClick={() => openQuestion(q)}
+                      disabled={q.played || !!currentQuestion}
+                    >
+                      {q.played ? '' : q.points}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
