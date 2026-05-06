@@ -27,16 +27,33 @@ sync-env:
 
 # ---------------------------------------------------------------------------
 # build-admin: sync + Vite-Build des Admin-Frontends
+# Baut im Docker-Node-Container, falls npm nicht lokal installiert ist.
 # ---------------------------------------------------------------------------
 build-admin: sync-env
-	cd admin-frontend && npm run build
+	@if command -v npm >/dev/null 2>&1; then \
+	  cd admin-frontend && npm run build; \
+	else \
+	  docker run --rm \
+	    -v "$(CURDIR)/admin-frontend:/app" \
+	    -w /app \
+	    node:20-alpine \
+	    sh -c "npm ci && npm run build"; \
+	fi
 	@echo "✓ Admin-Frontend gebaut"
 
 # ---------------------------------------------------------------------------
 # build-player: Vite-Build des Player-Frontends
 # ---------------------------------------------------------------------------
 build-player:
-	cd player-frontend && npm run build
+	@if command -v npm >/dev/null 2>&1; then \
+	  cd player-frontend && npm run build; \
+	else \
+	  docker run --rm \
+	    -v "$(CURDIR)/player-frontend:/app" \
+	    -w /app \
+	    node:20-alpine \
+	    sh -c "npm ci && npm run build"; \
+	fi
 	@echo "✓ Player-Frontend gebaut"
 
 # ---------------------------------------------------------------------------
