@@ -21,6 +21,26 @@ ask()    { echo -en "  ${BOLD}$*${RESET} " >&2; }
 
 # ---- Hilfsfunktionen ----
 
+# Erzeugt einen bcrypt-Hash — probiert htpasswd, python3, dann Docker
+generate_bcrypt_hash() {
+  local pass="$1"
+  if command -v htpasswd &>/dev/null; then
+    htpasswd -bnBC 10 "" "$pass" 2>/dev/null | tr -d ':\n'
+    return
+  fi
+  if command -v python3 &>/dev/null && python3 -c "import bcrypt" &>/dev/null 2>&1; then
+    python3 -c "import bcrypt,sys; print(bcrypt.hashpw(sys.argv[1].encode(), bcrypt.gensalt(10)).decode())" "$pass" 2>/dev/null
+    return
+  fi
+  if command -v docker &>/dev/null; then
+    printf '%s' "$pass" | docker run --rm -i caddy:2-alpine caddy hash-password 2>/dev/null \
+      || docker run --rm caddy:2-alpine caddy hash-password --plaintext "$pass" 2>/dev/null
+    return
+  fi
+  warn "Weder htpasswd, python3+bcrypt noch Docker verfügbar – Hash kann nicht erzeugt werden."
+  return 1
+}
+
 # Liest einen Wert aus einer .env-Datei
 env_get() {
   local file="$1" key="$2"
@@ -139,8 +159,8 @@ if [[ -n "$cur_hash" ]]; then
   if [[ -z "$new_pass" ]]; then
     ok "Vorhandener Hash übernommen"
   else
-    info "Erzeuge bcrypt-Hash via Docker + Caddy…"
-    raw_hash="$(docker run --rm caddy:2-alpine caddy hash-password --plaintext "$new_pass" 2>/dev/null)"
+    info "Erzeuge bcrypt-Hash…"
+    raw_hash="$(generate_bcrypt_hash "$new_pass")"
     cur_hash="$(printf '%s' "$raw_hash" | sed 's/\$/\$\$/g')"
     ok "Hash erzeugt"
   fi
@@ -149,8 +169,8 @@ else
   ask "Passwort eingeben (leer = kein Basic-Auth-Schutz):"
   read -rs new_pass; echo >&2
   if [[ -n "$new_pass" ]]; then
-    info "Erzeuge bcrypt-Hash via Docker + Caddy…"
-    raw_hash="$(docker run --rm caddy:2-alpine caddy hash-password --plaintext "$new_pass" 2>/dev/null)"
+    info "Erzeuge bcrypt-Hash…"
+    raw_hash="$(generate_bcrypt_hash "$new_pass")"
     cur_hash="$(printf '%s' "$raw_hash" | sed 's/\$/\$\$/g')"
     ok "Hash erzeugt: ${cur_hash:0:20}…"
   else
