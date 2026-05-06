@@ -224,8 +224,11 @@ export default function ControlPage({ toast }: Props) {
   }
 
   async function endGameNow() {
-    await apiFetch(`${API}/api/rooms/${roomCode}/end`, { method: 'POST' });
-    toast('Spiel beendet', 'info');
+    try {
+      await apiFetch(`${API}/api/rooms/${roomCode}/end`, { method: 'POST' });
+    } catch { /* ignore */ }
+    resetGameState();
+    navigate('/');
   }
 
   async function openQuestion(q: Question) {
