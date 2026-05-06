@@ -33,7 +33,7 @@ Das Script führt interaktiv durch alle Konfigurationsschritte und startet ansch
 
 1. Generiert `ADMIN_TOKEN` (oder übernimmt vorhandenen)
 2. Setzt Caddy-Basic-Auth-Passwort für `/admin/*` (bcrypt via Docker)
-3. Fragt `VITE_API_URL` und `VITE_PLAYER_URL`
+3. Setzt Frontend-URLs automatisch (`VITE_API_URL` = leer, `VITE_PLAYER_URL` = lokale IP)
 4. Baut beide Frontends und startet den Docker-Stack
 
 Nach erfolgreichem Setup:
@@ -53,8 +53,11 @@ Nach erfolgreichem Setup:
 | `make setup` | Interaktive Ersteinrichtung + Deploy |
 | `make deploy` | Frontends bauen + Stack neu starten |
 | `make build` | Beide Frontends bauen |
+| `make sync-env` | `ADMIN_TOKEN` / `ADMIN_PASSWORD_HASH` → Frontend-Envs synchronisieren |
 | `make up` | Stack starten (ohne Rebuild) |
 | `make down` | Stack stoppen |
+| `make test` | Go-Unit-Tests (mit Race-Detektor) |
+| `make test-api` | API-Tests via Newman (Postman-Collection) |
 
 ---
 
@@ -98,7 +101,8 @@ cd backend && go test ./...
 
 | Variable | Beschreibung |
 |---|---|
-| `VITE_ADMIN_TOKEN` | Identisch mit `ADMIN_TOKEN`; via `make build` automatisch gesetzt |
+| `VITE_ADMIN_TOKEN` | Identisch mit `ADMIN_TOKEN`; via `make sync-env` automatisch gesetzt |
+| `VITE_ADMIN_PASSWORD_HASH` | Bcrypt-Hash aus `ADMIN_PASSWORD_HASH` (base64-kodiert); via `make sync-env` gesetzt; leer = kein React-Login |
 | `VITE_API_URL` | Backend-URL (leer = gleiche Origin wie Caddy) |
 | `VITE_PLAYER_URL` | Player-URL für QR-Code-Anzeige |
 

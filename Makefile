@@ -1,4 +1,4 @@
-.PHONY: build build-admin build-player deploy up down sync-env setup
+.PHONY: build build-admin build-player deploy up down sync-env setup test test-api
 
 # Liest ADMIN_TOKEN aus der Root-.env (erste Zeile mit dem Key, kein Kommentar)
 ADMIN_TOKEN := $(shell grep -E '^ADMIN_TOKEN=' .env 2>/dev/null | cut -d= -f2)
@@ -7,6 +7,21 @@ ADMIN_TOKEN := $(shell grep -E '^ADMIN_TOKEN=' .env 2>/dev/null | cut -d= -f2)
 # sync-env: schreibt VITE_ADMIN_TOKEN in admin-frontend/.env
 #           (überschreibt nur diesen Wert, Rest der Datei bleibt erhalten)
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# test: Go-Unit-Tests mit Race-Detektor
+# ---------------------------------------------------------------------------
+test:
+	cd backend && go test ./... -race
+
+# ---------------------------------------------------------------------------
+# test-api: Postman-Collection via Newman (npm i -g newman vorausgesetzt)
+#           Liest ADMIN_TOKEN aus der Root-.env automatisch.
+# ---------------------------------------------------------------------------
+test-api:
+	newman run docs/postman/BrainStorm.postman_collection.json \
+	  -e docs/postman/BrainStorm.postman_environment.json \
+	  --env-var "adminToken=$(ADMIN_TOKEN)"
+
 sync-env:
 	@bash scripts/sync-env.sh
 
